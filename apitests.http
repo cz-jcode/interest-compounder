@@ -1,0 +1,151 @@
+# JetBrains HTTP Client scratch file for manual testing of the Compound API (Batch mode)
+#
+# How to use:
+# 1) Start the server:
+#    go run ./cmd/server
+# 2) Place the caret inside any request and press the green ▶ gutter icon.
+#
+# Base URL variable
+@base = http://localhost:8080
+@json = application/json
+
+###
+# Health (method not allowed) — demonstrates correct error for GET on POST-only endpoint
+# @name get_should_fail_method_not_allowed
+GET {{base}}/api/v1/compound
+
+###
+# Basic: single calculation — only initial principal, 7% p.a., 12 months
+# @name single_calc_basic
+POST {{base}}/api/v1/compound
+Content-Type: {{json}}
+
+{
+  "calculations": [
+    {
+      "name": "Single",
+      "currency": "CZK",
+      "initialPrincipal": 10000,
+      "annualRate": 0.07,
+      "totalMonths": 12,
+      "recurring": [],
+      "oneTime": []
+    }
+  ]
+}
+
+###
+# Two calculations with different lengths and params
+# @name two_calculations
+POST {{base}}/api/v1/compound
+Content-Type: {{json}}
+
+{
+  "calculations": [
+    {
+      "name": "A",
+      "currency": "CZK",
+      "initialPrincipal": 0,
+      "annualRate": 0.05,
+      "totalMonths": 24,
+      "recurring": [ { "schedule": "monthly", "amount": 200, "startMonth": 0, "endMonth": -1 } ],
+      "oneTime": [ { "amount": 1000, "atMonth": 0 }, { "amount": 500,  "atMonth": 12 } ]
+    },
+    {
+      "name": "B",
+      "currency": "EUR",
+      "initialPrincipal": 5000,
+      "annualRate": 0.06,
+      "totalMonths": 36,
+      "recurring": [ { "schedule": "daily", "amount": 2.5, "startMonth": 0, "endMonth": -1 }, { "schedule": "yearly", "amount": 1200, "startMonth": 0, "endMonth": -1 } ],
+      "oneTime": []
+    }
+  ]
+}
+
+###
+# Edge: totalMonths == 0 (server validates and should return 400 with message)
+# @name zero_months_should_400
+POST {{base}}/api/v1/compound
+Content-Type: {{json}}
+
+{
+  "calculations": [
+    {
+      "initialPrincipal": 1000,
+      "annualRate": 0.04,
+      "totalMonths": 0,
+      "recurring": [],
+      "oneTime": []
+    }
+  ]
+}
+
+###
+# Edge: negative annualRate — calc.Compute rejects (< 0)
+# @name negative_rate_should_400
+POST {{base}}/api/v1/compound
+Content-Type: {{json}}
+
+{
+  "calculations": [
+    {
+      "initialPrincipal": 1000,
+      "annualRate": -0.01,
+      "totalMonths": 6,
+      "recurring": [],
+      "oneTime": []
+    }
+  ]
+}
+
+###
+# Edge: unknown field (thanks to DisallowUnknownFields) should return 400
+# @name unknown_field_should_400
+POST {{base}}/api/v1/compound
+Content-Type: {{json}}
+
+{
+  "calculations": [
+    {
+      "initialPrincipal": 1000,
+      "annualRate": 0.03,
+      "totalMonths": 6,
+      "recurring": [],
+      "oneTime": [],
+      "unexpectedField": true
+    }
+  ]
+}
+
+###
+# Malformed JSON — missing closing brace
+# @name invalid_json_should_400
+POST {{base}}/api/v1/compound
+Content-Type: {{json}}
+
+{
+  "calculations": [
+    {
+      "initialPrincipal": 1000,
+      "annualRate": 0.03,
+      "totalMonths": 6,
+      "recurring": []
+
+###
+# Minimal valid: zero rate, zero principal, small horizon
+# @name minimal_valid
+POST {{base}}/api/v1/compound
+Content-Type: {{json}}
+
+{
+  "calculations": [
+    {
+      "initialPrincipal": 0,
+      "annualRate": 0.0,
+      "totalMonths": 3,
+      "recurring": [],
+      "oneTime": []
+    }
+  ]
+}

@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="cs">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title data-i18n="title">Compound Calculator UI</title>
+  <link rel="stylesheet" href="/styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <header class="topbar">
+    <h1 data-i18n="header">Investiční kalkulačka (měsíční úročení)</h1>
+    <div class="right">
+      <select id="langSelect" title="Language">
+        <option value="auto" data-i18n="lang.auto">Auto</option>
+        <option value="cs">Česky</option>
+        <option value="en">English</option>
+      </select>
+      <a href="https://github.com/" target="_blank" rel="noreferrer">GitHub</a>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="panel inputs">
+      <div class="panel-header">
+        <h2 data-i18n="inputs">Vstup</h2>
+        <div class="controls">
+          <div class="tabs" role="tablist">
+            <button class="tab active" id="tabFormBtn" data-target="#tabForm" role="tab" aria-selected="true" data-i18n="tab.form">Formulář</button>
+            <button class="tab" id="tabEditorBtn" data-target="#tabEditor" role="tab" aria-selected="false" data-i18n="tab.editor">Zdroj</button>
+          </div>
+        </div>
+      </div>
+
+
+      <div id="tabForm" class="tab-panel" role="tabpanel">
+        <div id="formHint" class="hint" hidden data-i18n="form.hintMulti">Formulář nyní podporuje více kalkulací. Můžete přidat/odebrat kalkulaci a upravovat je všechny zde. Editor (YAML/JSON) zůstává plně synchronizovaný.</div>
+        <div class="controls" style="margin:8px 0; display:flex; gap:8px; align-items:center;">
+          <button id="addCalcBtn" data-i18n="btn.addCalc">Přidat kalkulaci</button>
+        </div>
+        <div id="formMulti" class="form-multi"></div>
+      </div>
+
+      <div id="tabEditor" class="tab-panel" role="tabpanel" hidden>
+        <div class="controls" style="margin-bottom:8px; display:flex; gap:8px; align-items:center;">
+          <label class="toggle" title="Přepnout JSON/YAML (pro Editor)" data-i18n-title="toggle.modeTitle">
+            <input type="checkbox" id="modeToggle" checked>
+            <span id="modeLabel">YAML</span>
+          </label>
+          <button id="formatBtn" title="Naformátovat obsah" data-i18n="btn.format">Formátovat</button>
+          <button id="resetBtn" title="Obnovit ukázkový vstup" data-i18n="btn.reset">Reset</button>
+        </div>
+        <div id="editor"></div>
+        <div class="hint" data-i18n="hint.editor">Úpravy se posílají na backend s prodlevou ~400 ms. Neznámá pole backend odmítne.</div>
+        <div id="errorBox" class="error" hidden></div>
+      </div>
+    </section>
+
+    <section class="panel outputs">
+      <div class="panel-header">
+        <h2 data-i18n="outputs">Výstup a grafy</h2>
+        <div class="controls">
+          <label for="viewSelect" data-i18n="view.label">Zobrazení:</label>
+          <select id="viewSelect">
+            <option value="months" data-i18n="view.months">Měsíce</option>
+            <option value="years" data-i18n="view.years">Roky</option>
+          </select>
+        </div>
+      </div>
+
+      <div id="chartsContainer" class="charts-container">
+        <canvas id="chart"></canvas>
+        <div id="legend" class="chart-legend" aria-live="polite"></div>
+        <div id="legendHover" class="legend-hover" hidden></div>
+      </div>
+
+      <details class="raw">
+        <summary data-i18n="raw.title">Surová odpověď</summary>
+        <pre id="rawOut" class="code"></pre>
+      </details>
+    </section>
+  </main>
+
+  <!-- Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/ace-builds@1.36.2/src-min-noconflict/ace.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ace-builds@1.36.2/src-min-noconflict/ext-language_tools.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- App -->
+  <script src="/app.js"></script>
+</body>
+</html>

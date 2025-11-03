@@ -1,0 +1,31 @@
+# Go build artifacts
+bin/
+build/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Go modules / tooling
+vendor/
+
+# IDE/editor
+.idea/
+.vscode/
+*.iml
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Node/Web cache (if any in web/)
+web/node_modules/
+web/.cache/
+web/dist/
+web/build/
