@@ -36,7 +36,7 @@ const I18N = {
     'chart.months': 'Měsíce',
     'chart.years': 'Roky',
     'legend.principal': 'Vklad',
-    'legend.interest': 'Úrok',
+    'legend.interest': 'Obdržený úrok',
     'legend.header': 'Souhrn vstupů',
     'legend.rate': 'Sazba',
     'legend.months': 'Měsíce',
@@ -81,7 +81,7 @@ const I18N = {
     'chart.months': 'Months',
     'chart.years': 'Years',
     'legend.principal': 'Principal',
-    'legend.interest': 'Interest',
+    'legend.interest': 'Interest received',
     'legend.header': 'Input summary',
     'legend.rate': 'Rate',
     'legend.months': 'Months',
@@ -130,7 +130,7 @@ function debounce(fn, ms) {
 
 // --- Sample payload (Batch with multiple calculations) ---
 const sampleItem = {
-  name: 'Kalkulace 1',
+  name: 'Calculation 1',
   currency: (navigator.language?.startsWith('cs') ? 'CZK' : 'USD'),
   initialPrincipal: 10000,
   annualRate: 0.07,
@@ -144,7 +144,7 @@ const sampleItem = {
     { amount: 2000, atMonth: 12 }
   ]
 };
-const sample = { calculations: [ sampleItem, { ...sampleItem, name: 'Kalkulace 2', annualRate: 0.05, initialPrincipal: 5000, totalMonths: 60 } ] };
+const sample = { calculations: [ sampleItem, { ...sampleItem, name: 'Calculation 2', annualRate: 0.05, initialPrincipal: 5000, totalMonths: 60 } ] };
 
 let mode = 'yaml'; // default 'yaml' | 'json'
 let editor, chart;
@@ -307,7 +307,7 @@ function withAlpha(hex, alpha){
 }
 
 function calcDisplayName(req, idx){
-  const base = (currentLang==='cs'?'Kalkulace':'Calculation');
+  const base = 'Calculation';
   const nm = (req && typeof req.name==='string' && req.name.trim()) ? req.name.trim() : `${base} ${idx+1}`;
   return nm;
 }
@@ -436,7 +436,7 @@ function buildLegendHover(req, idx, color){
   const cur = req.currency || (currentLang==='cs'?'CZK':'USD');
   const recList = rec.map(r=>`<li>${r.schedule||'monthly'} · ${moneyWith(r.amount||0, cur)} · ${r.startMonth||0}→${(r.endMonth??-1)}</li>`).join('') || '<li>–</li>';
   const oneList = one.map(o=>`<li>${moneyWith(o.amount||0, cur)} @ M${o.atMonth||0}</li>`).join('') || '<li>–</li>';
-  const name = (req.name && req.name.trim()) ? req.name.trim() : `${t('calc.title')} ${idx+1}`;
+  const name = calcDisplayName(req, idx);
   return `
     <div class="legend-hover-inner">
       <div class="legend-hover-header">
@@ -477,13 +477,27 @@ function renderBarChart(labels, datasets, title){
   const data = { labels, datasets };
   const options = {
     responsive: true,
+    interaction: { mode: 'index', intersect: true },
     plugins: {
       title: { display: true, text: (currentLang==='cs'?'Vývoj portfolia – ':'Portfolio evolution – ') + title },
       legend: { display: false },
-      tooltip: { callbacks: { label: (ctx)=> {
-        const cur = ctx.dataset.currency || (currentLang==='cs'?'CZK':'USD');
-        return `${ctx.dataset.label}: ${moneyWith(ctx.parsed.y, cur)}`;
-      } } }
+      tooltip: {
+        filter: (ti) => {
+          const chart = ti.chart;
+          const active = chart.getActiveElements ? chart.getActiveElements() : (chart._active || []);
+          if (!active || active.length === 0) return true; // fallback to default
+          const datasets = chart.data?.datasets || [];
+          const activeDs = datasets[active[0].datasetIndex];
+          const ds = datasets[ti.datasetIndex];
+          return activeDs && ds && activeDs.stack === ds.stack; // only show same-calculation stack (principal + interest)
+        },
+        callbacks: {
+          label: (ctx)=> {
+            const cur = ctx.dataset.currency || (currentLang==='cs'?'CZK':'USD');
+            return `${ctx.dataset.label}: ${moneyWith(ctx.parsed.y, cur)}`;
+          }
+        }
+      }
     },
     scales: { y: { stacked: true, ticks: { callback: (v)=> numberFmt(v) } }, x: { stacked: true } }
   };
@@ -525,7 +539,7 @@ function renderFormMulti(){
     const wrap = document.createElement('div');
     const isCollapsed = !!collapsedState[idx];
     wrap.className = 'calc-card' + (isCollapsed ? ' collapsed' : '');
-    const displayName = (it.name && it.name.trim()) ? it.name.trim() : `${t('calc.title')} ${idx+1}`;
+    const displayName = calcDisplayName(it, idx);
     const summary = `${moneyWith(it.initialPrincipal||0, it.currency|| (currentLang==='cs'?'CZK':'USD'))} · ${t('legend.rate')}: ${numberFmt(it.annualRate||0)} · ${t('legend.months')}: ${it.totalMonths||0}`;
     const arrow = isCollapsed ? '▼' : '▲';
     const toggleTitle = isCollapsed ? t('btn.expand') : t('btn.collapse');
@@ -624,7 +638,8 @@ function bindForm(){
   // Add calculation button
   document.getElementById('addCalcBtn').addEventListener('click', ()=>{
     const b = normalizeBatch(currentInput);
-    b.calculations.push(normalizeItem({ initialPrincipal: 0, annualRate: 0.05, totalMonths: 12 }));
+    const nextIdx = b.calculations.length; // zero-based, display is +1
+    b.calculations.push(normalizeItem({ name: `Calculation ${nextIdx+1}` , initialPrincipal: 0, annualRate: 0.05, totalMonths: 12 }));
     currentInput = b;
     setEditorValueFromObject(currentInput);
     renderFormMulti();
