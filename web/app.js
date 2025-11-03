@@ -217,7 +217,7 @@ const sampleItem = {
     { amount: 2000, atMonth: 12 }
   ]
 };
-const sample = { calculations: [ sampleItem, { ...sampleItem, name: 'Calculation 2', annualRate: 0.05, initialPrincipal: 5000, totalMonths: 60 } ] };
+const sample = { calculations: [ sampleItem, { ...sampleItem, name: 'Calculation 2', annualRate: 0.05, initialPrincipal: 5000, totalMonths: 60, recurring: [ { schedule: 'monthly', amount: 100, startMonth: 0, endMonth: -1 } ], oneTime: [] } ] };
 
 let mode = 'yaml'; // default 'yaml' | 'json'
 let editor, chart, hoverStackId = null;
@@ -764,7 +764,19 @@ function bindForm(){
   document.getElementById('addCalcBtn').addEventListener('click', ()=>{
     const b = normalizeBatch(currentInput);
     const nextIdx = b.calculations.length; // zero-based, display is +1
-    b.calculations.push(normalizeItem({ name: `Calculation ${nextIdx+1}` , initialPrincipal: 0, annualRate: 0.05, totalMonths: 12 }));
+    // Determine defaults based on existing calculations
+    const last = b.calculations[nextIdx - 1];
+    const lastCurrency = last?.currency || (currentLang==='cs' ? 'CZK' : 'USD');
+    const maxMonths = Math.max(12, ...b.calculations.map(c => parseInt(c.totalMonths)||0));
+    b.calculations.push(normalizeItem({
+      name: `Calculation ${nextIdx+1}`,
+      currency: lastCurrency,
+      initialPrincipal: 0,
+      annualRate: 0.05,
+      totalMonths: maxMonths,
+      recurring: [ { schedule: 'monthly', amount: 100, startMonth: 0, endMonth: -1 } ],
+      oneTime: []
+    }));
     currentInput = b;
     setEditorValueFromObject(currentInput);
     renderFormMulti();
