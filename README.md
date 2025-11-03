@@ -114,3 +114,36 @@ MIT — see `LICENSE`.
 
 ## Links
 - Repo: https://github.com/cz-jcode/interest-compounder
+
+
+## Troubleshooting Docker/Compose on Windows
+If `docker compose up --build` fails with an error like:
+```
+unable to get image 'cz-jcode/interest-compounder:local': error during connect: Get "http://%2F%2F.%2Fpipe%2FdockerDesktopLinuxEngine/...": open //./pipe/dockerDesktopLinuxEngine: The system cannot find the file specified.
+```
+It means Docker Engine is not running (Docker Desktop is stopped or not installed), or the terminal didn’t pick up PATH changes after installing Docker/GitHub CLI.
+
+Follow these steps:
+1) Start Docker Desktop
+   - Click Start → search "Docker Desktop" → run it. Wait until the whale icon says "Docker Desktop is running".
+2) Open a NEW PowerShell window (so that PATH/env are refreshed)
+3) Verify Docker is up:
+   ```powershell
+   docker version
+   docker info
+   ```
+   Both commands should succeed without errors.
+4) Now build and run with Docker or Compose:
+   ```powershell
+   # Build & run image directly
+   docker build -t cz-jcode/interest-compounder:local .
+   docker run --rm -p 8080:8080 cz-jcode/interest-compounder:local
+
+   # Or with Compose (from project root)
+   docker compose up --build
+   ```
+
+Additional notes:
+- If you use WSL 2, ensure Docker Desktop → Settings → General → "Use the WSL 2 based engine" is enabled.
+- If you just installed Docker Desktop, a full Windows sign-out or terminal restart may be needed for PATH/daemon integration.
+- On corporate networks, verify proxy settings if pulls fail for other reasons.
