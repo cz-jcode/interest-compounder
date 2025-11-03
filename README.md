@@ -1,79 +1,116 @@
-# Compound Interest Calculator API (Go)
+# interest-compounder
 
-This project provides an HTTP API for simulating compound interest with multiple contribution schedules (daily, monthly, yearly) and one‑time injections. It returns monthly and yearly series suitable for plotting charts.
+Public Go HTTP API and web UI for simulating compound interest across multiple calculations, with recurring and one‑time contributions. Returns monthly and yearly series ready for charts. Multi‑calc output is stackable (principal + interest) with per‑calculation currency and naming.
 
-## Assumptions
-- Compounding occurs monthly with an effective monthly rate `annualRate/12`.
-- Daily recurring contributions are batched monthly as `amountPerDay * daysInMonth` using a 365-day calendar (no leap years): [31,28,31,30,31,30,31,31,30,31,30,31]. These are applied at the start of each month.
-- Monthly/yearly recurring contributions are applied either at the start or end of their period depending on `contributionTiming`.
-- One-time contributions are applied at the start of their target month (0-based month index).
-- All rates are decimal (e.g., `0.07` for 7%).
-- Amounts are in plain currency units and results are rounded to 2 decimals for reporting.
+## Features
+- Batch endpoint: send multiple calculations in one request (`calculations[]`).
+- Recurring schedules: `daily`, `monthly`, `yearly`; one‑time injections.
+- Timing: start/end of period for monthly/yearly recurring.
+- Monthly compounding; daily batched by month length [31,28,31,30,31,30,31,31,30,31,30,31] (no leap years).
+- Web UI (Chart.js + Ace), CS/EN i18n, per‑calculation currency and name.
 
-## Build & Run
+## Requirements
+- Go 1.21+ (tested with Go 1.25)
+- Optional: Docker / Docker Desktop
 
-Requires Go 1.21+
-
+## Run locally (Go)
 ```bash
 # from project root
 go run ./cmd/server
 # server listens on :8080
+# open http://localhost:8080 for the web UI
 ```
 
-## Endpoint
+## Run with Docker
+### Windows (Docker Desktop)
+```powershell
+# Build image
+docker build -t cz-jcode/interest-compounder:local .
+# Run container mapping port 8080
+docker run --rm -p 8080:8080 cz-jcode/interest-compounder:local
+# Open http://localhost:8080
+```
+
+### Linux (Docker Engine)
+```bash
+# Build image
+docker build -t cz-jcode/interest-compounder:local .
+# Run container
+docker run --rm -p 8080:8080 cz-jcode/interest-compounder:local
+```
+
+## Docker Compose
+```bash
+docker compose up --build
+# or (older) docker-compose up --build
+```
+
+## API
 - POST `/api/v1/compound`
 - Content-Type: `application/json`
 
-### Request JSON
+### Request JSON (Batch)
 ```json
 {
-  "initialPrincipal": 10000,
-  "annualRate": 0.07,
-  "totalMonths": 60,
-  "contributionTiming": "start", // or "end"
-  "recurring": [
-    {"schedule": "monthly", "amount": 300, "startMonth": 0, "endMonth": -1},
-    {"schedule": "yearly",  "amount": 1200, "startMonth": 0, "endMonth": -1},
-    {"schedule": "daily",   "amount": 5,   "startMonth": 0, "endMonth": 23}
-  ],
-  "oneTime": [
-    {"amount": 2000, "atMonth": 12}
+  "calculations": [
+    {
+      "name": "A",
+      "currency": "CZK",
+      "initialPrincipal": 10000,
+      "annualRate": 0.07,
+      "totalMonths": 60,
+      "recurring": [
+        {"schedule": "monthly", "amount": 300, "startMonth": 0, "endMonth": -1},
+        {"schedule": "yearly",  "amount": 1200, "startMonth": 0, "endMonth": -1},
+        {"schedule": "daily",   "amount": 5,   "startMonth": 0, "endMonth": 23}
+      ],
+      "oneTime": [ {"amount": 2000, "atMonth": 12} ]
+    },
+    { "name": "B", "currency": "EUR", "initialPrincipal": 5000, "annualRate": 0.05, "totalMonths": 36,
+      "recurring": [], "oneTime": [] }
   ]
 }
 ```
 
-- `totalMonths`: simulation horizon.
-- `startMonth` inclusive; `endMonth` inclusive. Use `-1` for no end (until horizon).
-- `daily.amount` is per-day amount.
+- `totalMonths` ≥ 1; `startMonth` and `endMonth` are inclusive; use `-1` for open‑ended.
+- `daily.amount` is per‑day; batched by month length.
 
-### Response JSON (excerpt)
+### Response JSON (Batch)
 ```json
 {
-  "monthly": [
-    {"month":0,"principal":10310.00,"interest":60.83,"balance":10370.83},
-    {"month":1,"principal":10620.00,"interest":61.93,"balance":10681.93}
-  ],
-  "yearly": [
-    {"year":1,"principal":... ,"interest":...,"balance":...},
-    {"year":2,"principal":... ,"interest":...,"balance":...}
-  ],
-  "totals": {"principal": ..., "interest": ..., "balance": ...}
+  "results": [
+    {
+      "request": {
+        "name": "A",
+        "currency": "CZK",
+        "initialPrincipal": 10000,
+        "annualRate": 0.07,
+        "totalMonths": 60,
+        "recurring": [],
+        "oneTime": []
+      },
+      "response": {
+        "monthly": [ {"month":0, "principal":10310.0, "interest":60.83, "balance":10370.83} ],
+        "yearly":  [ {"year":1, "principal":10620.0, "interest":122.76, "balance":10681.93} ],
+        "totals":  {"principal":10620.0, "interest":122.76, "balance":10681.93}
+      }
+    }
+  ]
 }
 ```
 
 ## Testing
-
 ```bash
 go test ./...
 ```
 
-The unit tests cover:
-- No contributions (pure compounding)
-- Monthly contributions with start vs. end timing
-- Daily contributions batched by days in month
-- Yearly contributions with start vs. end timing
-- One-time contributions applied by month offset
+## Versioning
+- Semantic Versioning (SemVer): MAJOR.MINOR.PATCH
+- Starting at `v0.1.0` while the API evolves; breaking changes will bump MAJOR (to `v1.0.0` and higher).
+- Tags will be created on GitHub releases.
 
-## Notes
-- If you need leap years or exact calendar date alignment, the daily batching logic can be adapted.
-- For taxes/fees/inflation adjustments, extend the `internal/calculator` package without changing HTTP contract.
+## License
+MIT — see `LICENSE`.
+
+## Links
+- Repo: https://github.com/cz-jcode/interest-compounder

@@ -523,20 +523,27 @@ function renderFormMulti(){
   container.innerHTML = '';
   list.forEach((it, idx)=>{
     const wrap = document.createElement('div');
-    wrap.className = 'calc-card' + (collapsedState[idx] ? ' collapsed' : '');
+    const isCollapsed = !!collapsedState[idx];
+    wrap.className = 'calc-card' + (isCollapsed ? ' collapsed' : '');
     const displayName = (it.name && it.name.trim()) ? it.name.trim() : `${t('calc.title')} ${idx+1}`;
     const summary = `${moneyWith(it.initialPrincipal||0, it.currency|| (currentLang==='cs'?'CZK':'USD'))} · ${t('legend.rate')}: ${numberFmt(it.annualRate||0)} · ${t('legend.months')}: ${it.totalMonths||0}`;
-    wrap.innerHTML = `
-      <div class="calc-header" data-action="toggle" data-cidx="${idx}">
-        <div class="left">
-          <strong>${displayName}</strong>
-          <span class="muted">${summary}</span>
-        </div>
-        <div class="actions">
+    const arrow = isCollapsed ? '▼' : '▲';
+    const toggleTitle = isCollapsed ? t('btn.expand') : t('btn.collapse');
+    const actionsHtml = isCollapsed ? '' : (
+      `<div class="actions">
           <button data-action="add-rec" data-cidx="${idx}">${t('btn.addRecurring')}</button>
           <button data-action="add-one" data-cidx="${idx}">${t('btn.addOneTime')}</button>
           <button data-action="del-calc" data-cidx="${idx}">${t('btn.delete')}</button>
+        </div>`
+    );
+    wrap.innerHTML = `
+      <div class="calc-header" data-action="toggle" data-cidx="${idx}" aria-expanded="${!isCollapsed}">
+        <div class="left">
+          <button class="toggle-btn" data-action="toggle" data-cidx="${idx}" title="${toggleTitle}" aria-label="${toggleTitle}">${arrow}</button>
+          <strong>${displayName}</strong>
+          <span class="muted">${summary}</span>
         </div>
+        ${actionsHtml}
       </div>
       <div class="calc-body">
         <div class="form-grid">
@@ -661,8 +668,10 @@ function bindForm(){
   });
 
   document.getElementById('formMulti').addEventListener('click', (e)=>{
-    const action = e.target.getAttribute('data-action');
-    const cidx = parseInt(e.target.getAttribute('data-cidx'));
+    const actEl = e.target.closest('[data-action]');
+    if (!actEl) return;
+    const action = actEl.getAttribute('data-action');
+    const cidx = parseInt(actEl.getAttribute('data-cidx'));
     const b = normalizeBatch(currentInput);
     if (action === 'toggle'){
       if (!Number.isNaN(cidx)) {
@@ -690,12 +699,12 @@ function bindForm(){
       it.oneTime.push({ amount:1000, atMonth:0 });
       currentInput = b; setEditorValueFromObject(currentInput); renderFormMulti(); computeDebounced();
     } else if (action === 'del-rec'){
-      const rIdx = parseInt(e.target.getAttribute('data-idx'));
+      const rIdx = parseInt(actEl.getAttribute('data-idx'));
       const it = b.calculations[cidx];
       it.recurring.splice(rIdx,1);
       currentInput = b; setEditorValueFromObject(currentInput); renderFormMulti(); computeDebounced();
     } else if (action === 'del-one'){
-      const oIdx = parseInt(e.target.getAttribute('data-idx'));
+      const oIdx = parseInt(actEl.getAttribute('data-idx'));
       const it = b.calculations[cidx];
       it.oneTime.splice(oIdx,1);
       currentInput = b; setEditorValueFromObject(currentInput); renderFormMulti(); computeDebounced();

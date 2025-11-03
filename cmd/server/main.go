@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"os"
 
-	"example.com/compoundapi/internal/calculator"
+	"github.com/cz-jcode/interest-compounder/internal/calculator"
 )
 
 type BatchRequest struct {
