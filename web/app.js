@@ -46,6 +46,22 @@ const I18N = {
     'form.currency': 'Měna',
     'btn.expand': 'Rozbalit',
     'btn.collapse': 'Sbalit',
+    // repo/i18n
+    'repo.save': 'Uložit',
+    'repo.load': 'Načíst',
+    'repo.copy': 'Kopírovat',
+    'repo.download': 'Stáhnout',
+    'repo.saveTitle': 'Uložit zdroj',
+    'repo.loadTitle': 'Načíst zdroj',
+    'repo.name': 'Název',
+    'repo.version': 'Verze',
+    'repo.cancel': 'Zrušit',
+    'repo.saveHint': 'Pokud název již existuje, vytvoří se nová verze. Potvrzené přepsání zachová starší verze.',
+    'repo.confirmOverwrite': 'Sada s tímto názvem již existuje. Vytvořit novou verzi pod tímto názvem?',
+    'repo.savedOk': 'Uloženo do úložiště prohlížeče.',
+    'repo.copied': 'Zdroj zkopírován do schránky.',
+    'repo.downloaded': 'Stahování zahájeno.',
+    'repo.noNames': 'Zatím žádné uložené sady.',
   },
   en: {
     title: 'Compound Calculator UI',
@@ -91,6 +107,22 @@ const I18N = {
     'form.currency': 'Currency',
     'btn.expand': 'Expand',
     'btn.collapse': 'Collapse',
+    // repo/i18n
+    'repo.save': 'Save',
+    'repo.load': 'Load',
+    'repo.copy': 'Copy',
+    'repo.download': 'Download',
+    'repo.saveTitle': 'Save source',
+    'repo.loadTitle': 'Load source',
+    'repo.name': 'Name',
+    'repo.version': 'Version',
+    'repo.cancel': 'Cancel',
+    'repo.saveHint': 'If the name already exists, a new version will be created. Overwrite keeps older versions.',
+    'repo.confirmOverwrite': 'A set with this name already exists. Create a new version under this name?',
+    'repo.savedOk': 'Saved to browser storage.',
+    'repo.copied': 'Source copied to clipboard.',
+    'repo.downloaded': 'Download started.',
+    'repo.noNames': 'No saved sets yet.',
   }
 };
 let currentLang = 'cs';
@@ -128,6 +160,47 @@ function debounce(fn, ms) {
   };
 }
 
+// --- Local repository (localStorage) ---
+const REPO_KEY = 'ic.repo';
+function nowIso(){ return new Date().toISOString(); }
+function repoRead(){
+  try { return JSON.parse(localStorage.getItem(REPO_KEY)||'{}')||{}; } catch{ return {}; }
+}
+function repoWrite(obj){ localStorage.setItem(REPO_KEY, JSON.stringify(obj)); }
+function repoEnsure(){
+  const r = repoRead();
+  if (!r.names) r.names = {}; if (!r.last) r.last = {};
+  return r;
+}
+function repoListNames(){
+  const r = repoEnsure(); return Object.keys(r.names).sort((a,b)=>a.localeCompare(b));
+}
+function repoGet(name){ const r = repoEnsure(); return r.names[name] || { versions: [] }; }
+function repoSave(name, text, savedMode){
+  name = (name||'').trim(); if (!name) throw new Error('name required');
+  const r = repoEnsure();
+  if (!r.names[name]) r.names[name] = { versions: [] };
+  const versions = r.names[name].versions;
+  const ts = nowIso();
+  const id = ts; // simple id by timestamp
+  versions.push({ id, ts, mode: savedMode||'yaml', data: text });
+  // keep last 50 versions per name to avoid unbounded growth
+  if (versions.length > 50) r.names[name].versions = versions.slice(-50);
+  r.last = { name, id };
+  repoWrite(r);
+  return { id, ts };
+}
+function repoListVersions(name){
+  const ent = repoGet(name); const arr = Array.isArray(ent.versions)? ent.versions : [];
+  // sort descending by ts
+  return [...arr].sort((a,b)=> (a.ts<b.ts?1:-1));
+}
+function repoLoadVersion(name, id){
+  const ent = repoGet(name); const v = (ent.versions||[]).find(v=>v.id===id);
+  if (!v) throw new Error('version not found');
+  return v;
+}
+
 // --- Sample payload (Batch with multiple calculations) ---
 const sampleItem = {
   name: 'Calculation 1',
@@ -162,12 +235,11 @@ function initEditor() {
     enableLiveAutocompletion: true,
     showPrintMargin: false,
   });
-  const toggle = document.getElementById('modeToggle');
-  const label = document.getElementById('modeLabel');
-  if (toggle) toggle.checked = true;
-  if (label) label.textContent = 'YAML';
+  // mode radios are initialized in hookUI; default is YAML
   setEditorValueFromObject(currentInput);
   editor.session.on('change', debounce(onEditorChanged, 400));
+  // ensure initial proper sizing
+  setTimeout(()=>{ try{ editor && editor.resize(); }catch{} }, 0);
 }
 
 function setEditorValueFromObject(obj) {
@@ -505,21 +577,45 @@ function renderBarChart(labels, datasets, title){
   chart = new Chart(ctx, { type: 'bar', data, options });
 }
 
-function bindTabs(){
+function setActiveTab(which){
   const btnEditor = document.getElementById('tabEditorBtn');
   const btnForm = document.getElementById('tabFormBtn');
   const tabEditor = document.getElementById('tabEditor');
   const tabForm = document.getElementById('tabForm');
-  btnEditor.addEventListener('click', () => {
-    btnEditor.classList.add('active'); btnEditor.setAttribute('aria-selected', 'true');
-    btnForm.classList.remove('active'); btnForm.setAttribute('aria-selected', 'false');
-    tabEditor.hidden = false; tabForm.hidden = true;
-  });
-  btnForm.addEventListener('click', () => {
-    btnForm.classList.add('active'); btnForm.setAttribute('aria-selected', 'true');
-    btnEditor.classList.remove('active'); btnEditor.setAttribute('aria-selected', 'false');
-    tabEditor.hidden = true; tabForm.hidden = false;
-  });
+  const isForm = which === 'form';
+  if (btnForm && btnEditor){
+    btnForm.classList.toggle('active', isForm);
+    btnEditor.classList.toggle('active', !isForm);
+    btnForm.setAttribute('aria-selected', String(isForm));
+    btnEditor.setAttribute('aria-selected', String(!isForm));
+  }
+  if (tabForm && tabEditor){
+    tabForm.hidden = !isForm;
+    tabEditor.hidden = isForm;
+  }
+  if (!isForm){
+    setTimeout(()=>{ try{ editor && editor.resize(); }catch{} }, 0);
+  }
+}
+function bindTabs(){
+  const btnEditor = document.getElementById('tabEditorBtn');
+  const btnForm = document.getElementById('tabFormBtn');
+  if (btnEditor) btnEditor.addEventListener('click', () => setActiveTab('editor'));
+  if (btnForm) btnForm.addEventListener('click', () => setActiveTab('form'));
+  // Keyboard navigation: Left/Right arrows cycle between tabs
+  const tabsContainer = document.querySelector('.tabs[role="tablist"]');
+  if (tabsContainer){
+    tabsContainer.addEventListener('keydown', (ev)=>{
+      if (ev.key === 'ArrowLeft' || ev.key === 'ArrowRight'){
+        ev.preventDefault();
+        const isFormActive = document.getElementById('tabForm') && !document.getElementById('tabForm').hidden;
+        if (ev.key === 'ArrowRight') setActiveTab(isFormActive ? 'editor' : 'form');
+        else setActiveTab(isFormActive ? 'editor' : 'form');
+      }
+    });
+  }
+  // Ensure initial state strictly shows only one panel (Form by default)
+  setActiveTab('form');
 }
 
 // --- Multi-calc Form ---
@@ -743,21 +839,31 @@ function hookUI() {
   langSel.addEventListener('change', ()=>{ localStorage.setItem('lang', langSel.value); currentLang = getLang(); updateLocale(); applyI18n(); const raw = document.getElementById('rawOut').textContent; if (raw) { try { renderOutputBatch(JSON.parse(raw)); } catch(_){} } });
 
 
-  // Editor controls
-  document.getElementById('modeToggle').addEventListener('change', (e) => {
-    mode = e.target.checked ? 'yaml' : 'json';
-    document.getElementById('modeLabel').textContent = mode.toUpperCase();
+  // Editor mode radios (YAML/JSON)
+  const rYaml = document.getElementById('modeYaml');
+  const rJson = document.getElementById('modeJson');
+  function applyMode(newMode){
+    mode = (newMode === 'json') ? 'json' : 'yaml';
+    if (rYaml) rYaml.checked = (mode === 'yaml');
+    if (rJson) rJson.checked = (mode === 'json');
     setEditorValueFromObject(currentInput);
     computeDebounced();
-  });
+    setTimeout(()=>{ try{ editor && editor.resize(); }catch{} }, 0);
+  }
+  if (rYaml) rYaml.addEventListener('change', (e)=>{ if (e.target.checked) applyMode('yaml'); });
+  if (rJson) rJson.addEventListener('change', (e)=>{ if (e.target.checked) applyMode('json'); });
+  // initialize radios to current mode
+  if (rYaml || rJson) { applyMode(mode); }
   document.getElementById('formatBtn').addEventListener('click', () => {
     setEditorValueFromObject(readEditorAsObject() || currentInput);
+    setTimeout(()=>{ try{ editor && editor.resize(); }catch{} }, 0);
   });
   document.getElementById('resetBtn').addEventListener('click', () => {
     currentInput = structuredClone ? structuredClone(sample) : JSON.parse(JSON.stringify(sample));
     setEditorValueFromObject(currentInput);
     renderFormMulti();
     computeDebounced();
+    setTimeout(()=>{ try{ editor && editor.resize(); }catch{} }, 0);
   });
   document.getElementById('viewSelect').addEventListener('change', (e) => {
     e.target.dataset.userSet = 'true';
@@ -766,8 +872,157 @@ function hookUI() {
     try { renderOutputBatch(JSON.parse(raw)); } catch (_) {}
   });
 
+  // Repo buttons
+  const saveBtn = document.getElementById('saveRepoBtn');
+  const loadBtn = document.getElementById('loadRepoBtn');
+  const copyBtn = document.getElementById('copyBtn');
+  const downloadBtn = document.getElementById('downloadBtn');
+  if (saveBtn) saveBtn.addEventListener('click', openSaveDialog);
+  if (loadBtn) loadBtn.addEventListener('click', openLoadDialog);
+  if (copyBtn) copyBtn.addEventListener('click', copySourceToClipboard);
+  if (downloadBtn) downloadBtn.addEventListener('click', downloadSourceToFile);
+
+  const saveConfirm = document.getElementById('saveConfirmBtn');
+  const saveCancel = document.getElementById('saveCancelBtn');
+  if (saveConfirm) saveConfirm.addEventListener('click', confirmSaveRepo);
+  if (saveCancel) saveCancel.addEventListener('click', closeDialogs);
+
+  const loadConfirm = document.getElementById('loadConfirmBtn');
+  const loadCancel = document.getElementById('loadCancelBtn');
+  const nameSel = document.getElementById('loadNameSelect');
+  const verSel = document.getElementById('loadVersionSelect');
+  if (loadConfirm) loadConfirm.addEventListener('click', confirmLoadRepo);
+  if (loadCancel) loadCancel.addEventListener('click', closeDialogs);
+  if (nameSel) nameSel.addEventListener('change', populateLoadVersions);
+  if (verSel) verSel.addEventListener('change', updateLoadMeta);
+
+  // Backdrop click and ESC to close
+  const backdrop = document.getElementById('modalBackdrop');
+  if (backdrop) backdrop.addEventListener('click', closeDialogs);
+  document.addEventListener('keydown', (ev)=>{
+    if (ev.key === 'Escape'){
+      const host = document.getElementById('repoDialogs');
+      if (host && !host.hidden) closeDialogs();
+    }
+  });
+  // Resize Ace on window resize
+  window.addEventListener('resize', debounce(()=>{ try{ editor && editor.resize(); }catch{} }, 100));
+
   // Form bindings
   bindForm();
+}
+
+function closeDialogs(){
+  const host = document.getElementById('repoDialogs');
+  if (host) host.hidden = true;
+  document.querySelectorAll('.repo-dialog').forEach(d=> d.hidden = true);
+  const backdrop = document.getElementById('modalBackdrop');
+  if (backdrop) backdrop.hidden = true;
+  document.body.classList.remove('modal-open');
+}
+function openSaveDialog(){
+  applyI18n();
+  const host = document.getElementById('repoDialogs'); const dlg = document.getElementById('saveDialog');
+  const inp = document.getElementById('saveNameInput');
+  if (host && dlg){ host.hidden = false; dlg.hidden = false; }
+  const backdrop = document.getElementById('modalBackdrop'); if (backdrop) backdrop.hidden = false;
+  document.body.classList.add('modal-open');
+  // Default name: last used or first calc name, fallback to "Project"
+  const r = repoRead();
+  let def = (r.last && r.last.name) ? r.last.name : '';
+  if (!def){
+    try { const b = normalizeBatch(currentInput); const nm = (b.calculations?.[0]?.name||'').trim(); if (nm) def = nm; } catch{}
+  }
+  if (!def) def = 'Project';
+  if (inp){ inp.value = def; inp.select(); inp.focus(); }
+}
+function formatTs(ts){ try { return new Date(ts).toLocaleString(currentLocale); } catch { return ts; } }
+function openLoadDialog(){
+  applyI18n();
+  const host = document.getElementById('repoDialogs'); const dlg = document.getElementById('loadDialog');
+  if (host && dlg){ host.hidden = false; dlg.hidden = false; }
+  const backdrop = document.getElementById('modalBackdrop'); if (backdrop) backdrop.hidden = false;
+  document.body.classList.add('modal-open');
+  populateLoadNames();
+}
+function populateLoadNames(){
+  const sel = document.getElementById('loadNameSelect');
+  const names = repoListNames();
+  sel.innerHTML = '';
+  if (names.length===0){ const opt = document.createElement('option'); opt.value=''; opt.textContent = t('repo.noNames'); sel.appendChild(opt); }
+  names.forEach(n=>{ const opt = document.createElement('option'); opt.value = n; opt.textContent = n; sel.appendChild(opt); });
+  populateLoadVersions();
+}
+function populateLoadVersions(){
+  const name = document.getElementById('loadNameSelect').value;
+  const sel = document.getElementById('loadVersionSelect');
+  const meta = document.getElementById('loadMeta');
+  sel.innerHTML = '';
+  meta.textContent = '';
+  if (!name){ return; }
+  const versions = repoListVersions(name);
+  versions.forEach(v=>{ const opt = document.createElement('option'); opt.value = v.id; opt.textContent = `${formatTs(v.ts)} · ${v.mode.toUpperCase()}`; sel.appendChild(opt); });
+  updateLoadMeta();
+}
+function updateLoadMeta(){
+  const name = document.getElementById('loadNameSelect').value;
+  const ver = document.getElementById('loadVersionSelect').value;
+  const meta = document.getElementById('loadMeta');
+  if (!name || !ver){ meta.textContent=''; return; }
+  try{
+    const v = repoLoadVersion(name, ver);
+    meta.textContent = `${name} — ${formatTs(v.ts)} · ${v.mode.toUpperCase()} · ${v.data.length} bytes`;
+  }catch{ meta.textContent=''; }
+}
+function confirmSaveRepo(){
+  const inp = document.getElementById('saveNameInput');
+  let name = (inp?.value||'').trim();
+  if (!name){ alert('Name required'); return; }
+  const text = editor.getValue();
+  // If name exists, ask for confirmation (new version)
+  const exists = repoListNames().includes(name);
+  if (exists){ if (!confirm(t('repo.confirmOverwrite'))) return; }
+  repoSave(name, text, mode);
+  closeDialogs();
+  try { alert(t('repo.savedOk')); } catch{}
+}
+function confirmLoadRepo(){
+  const name = document.getElementById('loadNameSelect').value;
+  const ver = document.getElementById('loadVersionSelect').value;
+  if (!name || !ver) { closeDialogs(); return; }
+  try{
+    const v = repoLoadVersion(name, ver);
+    // switch mode to saved mode
+    mode = (v.mode==='json')? 'json' : 'yaml';
+    const toggle = document.getElementById('modeToggle'); const label = document.getElementById('modeLabel');
+    if (toggle) toggle.checked = (mode==='yaml'); if (label) label.textContent = mode.toUpperCase();
+    // set editor and parse
+    editor.session.setMode(mode==='json'?'ace/mode/json':'ace/mode/yaml');
+    editor.setValue(v.data, -1);
+    const obj = readEditorAsObject();
+    if (obj){ currentInput = normalizeBatch(obj); renderFormMulti(); computeDebounced(); }
+  }catch(e){ showError((currentLang==='cs'?'Načtení selhalo: ':'Load failed: ') + (e.message||String(e))); }
+  closeDialogs();
+}
+async function copySourceToClipboard(){
+  const text = editor.getValue();
+  if (navigator.clipboard && navigator.clipboard.writeText){
+    try{ await navigator.clipboard.writeText(text); alert(t('repo.copied')); }catch{ fallbackCopy(text); }
+  } else { fallbackCopy(text); }
+}
+function fallbackCopy(text){
+  const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); try{ document.execCommand('copy'); alert(t('repo.copied')); }catch{} finally{ document.body.removeChild(ta); }
+}
+function downloadSourceToFile(){
+  const text = editor.getValue();
+  const r = repoRead(); const name = (r.last?.name)||'set';
+  const ext = (mode==='json')? 'json' : 'yaml';
+  const ts = new Date().toISOString().replace(/[:]/g,'-');
+  const fname = `${name}.${ts}.${ext}`;
+  const blob = new Blob([text], { type: (mode==='json'?'application/json':'text/yaml') });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = fname; document.body.appendChild(a); a.click(); document.body.removeChild(a); setTimeout(()=>URL.revokeObjectURL(url), 0);
+  try { alert(t('repo.downloaded')); } catch{}
 }
 
 function main() {

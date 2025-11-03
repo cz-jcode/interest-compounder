@@ -13,6 +13,13 @@
   <header class="topbar">
     <h1 data-i18n="header">Investiční kalkulačka (měsíční úročení)</h1>
     <div class="right">
+      <!-- Project-level repository controls -->
+      <div class="repo-controls">
+        <button id="saveRepoBtn" title="Uložit do úložiště prohlížeče" data-i18n="repo.save">Uložit</button>
+        <button id="loadRepoBtn" title="Načíst ze úložiště" data-i18n="repo.load">Načíst</button>
+        <button id="copyBtn" title="Zkopírovat zdroj do schránky" data-i18n="repo.copy">Kopírovat</button>
+        <button id="downloadBtn" title="Stáhnout zdroj jako soubor" data-i18n="repo.download">Stáhnout</button>
+      </div>
       <select id="langSelect" title="Language">
         <option value="auto" data-i18n="lang.auto">Auto</option>
         <option value="cs">Česky</option>
@@ -24,13 +31,10 @@
 
   <main class="container">
     <section class="panel inputs">
-      <div class="panel-header">
-        <h2 data-i18n="inputs">Vstup</h2>
-        <div class="controls">
-          <div class="tabs" role="tablist">
-            <button class="tab active" id="tabFormBtn" data-target="#tabForm" role="tab" aria-selected="true" data-i18n="tab.form">Formulář</button>
-            <button class="tab" id="tabEditorBtn" data-target="#tabEditor" role="tab" aria-selected="false" data-i18n="tab.editor">Zdroj</button>
-          </div>
+      <div class="panel-header tabs-header">
+        <div class="tabs" role="tablist" aria-label="Input tabs">
+          <button class="tab active" id="tabFormBtn" data-target="#tabForm" role="tab" aria-controls="tabForm" aria-selected="true" data-i18n="tab.form">Formulář</button>
+          <button class="tab" id="tabEditorBtn" data-target="#tabEditor" role="tab" aria-controls="tabEditor" aria-selected="false" data-i18n="tab.editor">Zdroj</button>
         </div>
       </div>
 
@@ -45,12 +49,12 @@
 
       <div id="tabEditor" class="tab-panel" role="tabpanel" hidden>
         <div class="controls" style="margin-bottom:8px; display:flex; gap:8px; align-items:center;">
-          <label class="toggle" title="Přepnout JSON/YAML (pro Editor)" data-i18n-title="toggle.modeTitle">
-            <input type="checkbox" id="modeToggle" checked>
-            <span id="modeLabel">YAML</span>
-          </label>
           <button id="formatBtn" title="Naformátovat obsah" data-i18n="btn.format">Formátovat</button>
           <button id="resetBtn" title="Obnovit ukázkový vstup" data-i18n="btn.reset">Reset</button>
+          <div class="mode" title="Přepnout JSON/YAML (pro Editor)" data-i18n-title="toggle.modeTitle" role="group" aria-label="Mode">
+            <label><input type="radio" name="modeRadio" id="modeYaml" value="yaml" checked> YAML</label>
+            <label><input type="radio" name="modeRadio" id="modeJson" value="json"> JSON</label>
+          </div>
         </div>
         <div id="editor"></div>
         <div class="hint" data-i18n="hint.editor">Úpravy se posílají na backend s prodlevou ~400 ms. Neznámá pole backend odmítne.</div>
@@ -82,6 +86,44 @@
       </details>
     </section>
   </main>
+
+  <!-- Backdrop and dialogs (global) -->
+  <div id="modalBackdrop" class="backdrop" hidden></div>
+  <div id="repoDialogs" class="repo-dialogs" hidden>
+    <div id="saveDialog" class="repo-dialog" role="dialog" aria-modal="true" aria-labelledby="saveDialogTitle" hidden>
+      <div id="saveDialogTitle" class="repo-dialog-header" data-i18n="repo.saveTitle">Uložit zdroj</div>
+      <div class="repo-dialog-body">
+        <label>
+          <span data-i18n="repo.name">Název</span>
+          <input type="text" id="saveNameInput" placeholder="Project">
+        </label>
+        <div class="hint" data-i18n="repo.saveHint">Při stejném názvu se vytvoří nová verze. Pokud potvrdíte přepsání, starší verze zůstane zachována.</div>
+      </div>
+      <div class="repo-dialog-actions">
+        <button id="saveConfirmBtn" data-i18n="repo.save">Uložit</button>
+        <button id="saveCancelBtn" data-i18n="repo.cancel">Zrušit</button>
+      </div>
+    </div>
+
+    <div id="loadDialog" class="repo-dialog" role="dialog" aria-modal="true" aria-labelledby="loadDialogTitle" hidden>
+      <div id="loadDialogTitle" class="repo-dialog-header" data-i18n="repo.loadTitle">Načíst zdroj</div>
+      <div class="repo-dialog-body">
+        <label>
+          <span data-i18n="repo.name">Název</span>
+          <select id="loadNameSelect"></select>
+        </label>
+        <label>
+          <span data-i18n="repo.version">Verze</span>
+          <select id="loadVersionSelect"></select>
+        </label>
+        <div class="hint" id="loadMeta"></div>
+      </div>
+      <div class="repo-dialog-actions">
+        <button id="loadConfirmBtn" data-i18n="repo.load">Načíst</button>
+        <button id="loadCancelBtn" data-i18n="repo.cancel">Zrušit</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Libraries -->
   <script src="https://cdn.jsdelivr.net/npm/ace-builds@1.36.2/src-min-noconflict/ace.js"></script>
