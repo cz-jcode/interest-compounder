@@ -220,7 +220,7 @@ const sampleItem = {
 const sample = { calculations: [ sampleItem, { ...sampleItem, name: 'Calculation 2', annualRate: 0.05, initialPrincipal: 5000, totalMonths: 60 } ] };
 
 let mode = 'yaml'; // default 'yaml' | 'json'
-let editor, chart;
+let editor, chart, hoverStackId = null;
 let currentInput = structuredClone ? structuredClone(sample) : JSON.parse(JSON.stringify(sample));
 let prevMonths = null;
 let collapsedState = []; // per-calc collapsed state
@@ -550,18 +550,47 @@ function renderBarChart(labels, datasets, title){
   const options = {
     responsive: true,
     interaction: { mode: 'index', intersect: true },
+    onHover: (evt, elements, c) => {
+      // Use precise hit-test to find the nearest element under cursor, not just the first active
+      try {
+        const nearest = c.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
+        if (nearest && nearest.length > 0) {
+          const di = nearest[0].datasetIndex;
+          const ds = c.data?.datasets?.[di];
+          hoverStackId = ds?.stack || null;
+        } else {
+          hoverStackId = null;
+        }
+      } catch (_) {
+        // Fallback to active elements if needed
+        if (elements && elements.length > 0) {
+          const di = elements[0].datasetIndex;
+          const ds = c.data?.datasets?.[di];
+          hoverStackId = ds?.stack || null;
+        } else {
+          hoverStackId = null;
+        }
+      }
+    },
     plugins: {
       title: { display: true, text: (currentLang==='cs'?'Vývoj portfolia – ':'Portfolio evolution – ') + title },
       legend: { display: false },
       tooltip: {
         filter: (ti) => {
           const chart = ti.chart;
-          const active = chart.getActiveElements ? chart.getActiveElements() : (chart._active || []);
-          if (!active || active.length === 0) return true; // fallback to default
           const datasets = chart.data?.datasets || [];
-          const activeDs = datasets[active[0].datasetIndex];
           const ds = datasets[ti.datasetIndex];
-          return activeDs && ds && activeDs.stack === ds.stack; // only show same-calculation stack (principal + interest)
+          if (!ds) return false;
+          if (hoverStackId) {
+            return ds.stack === hoverStackId;
+          }
+          // Fallback: try active elements as last resort
+          const active = chart.getActiveElements ? chart.getActiveElements() : (chart._active || []);
+          if (active && active.length > 0) {
+            const activeDs = datasets[active[0].datasetIndex];
+            return activeDs && activeDs.stack === ds.stack;
+          }
+          return true;
         },
         callbacks: {
           label: (ctx)=> {
