@@ -1,13 +1,33 @@
 *{box-sizing:border-box}
 :root{--bg:#0b1020;--card:#111936;--muted:#b7c3d7;--text:#e7eefc;--accent:#4f7cff;--accent2:#38bdf8;--danger:#ef4444;color-scheme:dark}
 html,body{height:100%}
-body{margin:0;font-family:'Inter',system-ui,Segoe UI,Roboto,Arial,sans-serif;background:linear-gradient(180deg,#0b1020 0%,#0b1428 45%,#0d1530 100%);color:var(--text)}
+body{margin:0;font-family:'Inter',system-ui,Segoe UI,Roboto,Arial,sans-serif;background:linear-gradient(180deg,#0b1020 0%,#0b1428 45%,#0d1530 100%);color:var(--text);overflow:hidden}
 .topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid rgba(255,255,255,.06);backdrop-filter:blur(6px);position:sticky;top:0;z-index:10}
 .topbar h1{margin:0;font-size:18px}
+.topbar .brand{display:flex;align-items:center;gap:10px}
+.topbar .brand .logo{display:inline-flex;align-items:center;justify-content:center}
 .topbar .right{display:flex;gap:10px;align-items:center}
 .topbar .right a{color:var(--muted);text-decoration:none}
-.container{padding:16px;display:grid;grid-template-columns:1fr 1.2fr;gap:16px;min-height:calc(100vh - 64px)}
-@media (max-width:1100px){.container{grid-template-columns:1fr}}
+.topbar .gh-link{display:inline-flex;align-items:center;gap:6px;padding:4px 8px;border:1px solid rgba(255,255,255,.18);border-radius:8px;color:var(--text)}
+.topbar .gh-link:hover{filter:brightness(1.08)}
+.container{padding:16px;display:flex;gap:10px;min-height:calc(100vh - 64px);height:calc(100vh - 64px);overflow:hidden;position:relative}
+@media (max-width:1100px){.container{flex-direction:column}}
+/* Split layout defaults: 40% inputs / 60% outputs */
+.panel.inputs{flex:0 0 40%; min-width:260px}
+.panel.outputs{flex:1 1 0; display:flex; flex-direction:column; min-height:0; overflow:hidden}
+.splitter{width:8px; flex:0 0 8px; cursor:col-resize; display:flex; align-items:center; justify-content:center; position:relative}
+.splitter::before{content:""; width:2px; height:70%; background:rgba(255,255,255,.18); border-radius:2px}
+/* Collapse button on splitter */
+.collapse-btn{position:absolute; top:6px; transform:translateX(-50%); left:50%; width:22px;height:22px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:var(--text);border-radius:6px;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;padding:0}
+/* Docked-left minimized state: splitter becomes a slim overlay at far left with only the icon visible */
+.splitter.docked-left{position:absolute; left:0; top:0; bottom:0; width:16px; cursor:pointer; z-index:5}
+.splitter.docked-left::before{display:none}
+.splitter.docked-left .collapse-btn{top:50%; left:50%; transform:translate(-50%,-50%); width:16px; height:16px}
+/* Mobile/narrow: stack and hide splitter */
+@media (max-width:1100px){.splitter{display:none}.panel.inputs,.panel.outputs{flex:1 1 auto;min-width:auto; height:auto}}
+/* Collapsed left panel */
+.panel.inputs.collapsed{flex-basis:0 !important;width:0 !important;min-width:0 !important;padding:0 !important;border-width:0 !important;overflow:hidden}
+.panel.inputs.collapsed .panel-header, .panel.inputs.collapsed .tab-panel{display:none}
 .panel{background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.02));border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
 .panel-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
 .panel h2{margin:8px 0;font-size:16px}
@@ -19,8 +39,8 @@ body{margin:0;font-family:'Inter',system-ui,Segoe UI,Roboto,Arial,sans-serif;bac
 .mode{display:flex;gap:8px;align-items:center}
 /* Make inputs panel and tab content flexible to let Ace fill height */
 .panel.inputs{display:flex;flex-direction:column;min-height:60vh}
-.tab-panel{margin-top:8px;display:flex;flex-direction:column;min-height:0}
-#tabEditor{flex:1;display:flex;flex-direction:column;min-height:0}
+.tab-panel{margin-top:8px;display:flex;flex-direction:column;min-height:0;overflow:auto}
+#tabEditor{flex:1;display:flex;flex-direction:column;min-height:0;overflow:hidden}
 #editor{width:100%;border-radius:8px;overflow:hidden;border:1px solid rgba(255,255,255,.08);flex:1;min-height:240px;height:auto}
 .form-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
 .form-grid label{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--muted)}
@@ -41,11 +61,11 @@ body{margin:0;font-family:'Inter',system-ui,Segoe UI,Roboto,Arial,sans-serif;bac
 .kpi .value{font-weight:700;font-size:18px;margin-top:4px}
 .raw{margin-top:12px}
 .code{background:rgba(0,0,0,.35);border-radius:8px;padding:12px;overflow:auto;max-height:240px;border:1px solid rgba(255,255,255,.08)}
-.charts-container{display:flex;flex-direction:column;gap:16px}
+.charts-container{display:flex;flex-direction:column;gap:16px;flex:1;min-height:0}
 .chart-card{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px}
 .chart-card .title{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
 .chart-controls{display:flex;gap:8px;align-items:center}
-canvas{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:8px}
+canvas{background:rgba(255,255,255,.02);border:1px solid rgba(255,255,255,.08);border-radius:8px;flex:1;min-height:140px;height:100%}
 button{background:linear-gradient(180deg,var(--accent),#365dda);border:none;color:#fff;padding:6px 10px;border-radius:8px;cursor:pointer}
 button:hover{filter:brightness(1.05)}
 select{background:rgba(255,255,255,.06);color:var(--text);border:1px solid rgba(255,255,255,.18);padding:6px 10px;border-radius:8px}
@@ -64,6 +84,7 @@ select{background:rgba(255,255,255,.06);color:var(--text);border:1px solid rgba(
 
 /* Custom legend */
 .chart-legend{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+.chart-legend.scroll{max-height:160px;overflow:auto;padding-right:4px}
 .legend-item{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:6px 8px}
 .legend-item .swatch{width:14px;height:14px;border-radius:3px;border:2px solid rgba(255,255,255,.2);display:inline-block}
 .legend-item .legend-text{color:var(--text);font-size:12px}
@@ -72,6 +93,10 @@ select{background:rgba(255,255,255,.06);color:var(--text);border:1px solid rgba(
 .legend-hover .legend-hover-inner .row{display:flex;justify-content:space-between;gap:8px;font-size:12px;color:var(--muted)}
 .legend-hover .mini{margin:4px 0 6px 18px;padding:0;color:var(--muted);font-size:12px}
 .legend-hover .mini li{margin:2px 0}
+
+/* Icon button */
+.icon-btn{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.18);border-radius:8px;color:var(--text);padding:4px 8px;line-height:1}
+.icon-btn:hover{filter:brightness(1.08)}
 
 /* Topbar repo controls */
 .sep{display:inline-block;width:1px;height:20px;background:rgba(255,255,255,.18)}

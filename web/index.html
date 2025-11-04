@@ -4,6 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title data-i18n="title">Compound Calculator UI</title>
+  <link rel="icon" type="image/svg+xml" href="/logo.svg">
   <link rel="stylesheet" href="/styles.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -11,7 +12,12 @@
 </head>
 <body>
   <header class="topbar">
-    <h1 data-i18n="header">Investment Calculator (monthly compounding)</h1>
+    <div class="brand">
+      <a href="./" class="logo" aria-label="interest-compounder home">
+        <img src="logo.svg" alt="interest-compounder logo" width="32" height="32" />
+      </a>
+      <h1 data-i18n="header">Investment Calculator (monthly compounding)</h1>
+    </div>
     <div class="right">
       <!-- Project-level repository controls -->
       <div class="repo-controls">
@@ -19,6 +25,7 @@
         <button id="loadRepoBtn" data-i18n="repo.load" data-i18n-title="repo.loadTitle" title="Load source">Load</button>
         <button id="copyBtn" data-i18n="repo.copy" title="Copy source to clipboard">Copy</button>
         <button id="downloadBtn" data-i18n="repo.download" title="Download current source">Download</button>
+        <button id="resetBtn" data-i18n="btn.reset" title="Restore sample input">Reset</button>
       </div>
       <select id="langSelect" title="Language">
         <option value="auto" data-i18n="lang.auto">Auto</option>
@@ -26,19 +33,23 @@
         <option value="de">Deutsch</option>
         <option value="en">English</option>
       </select>
-      <a href="https://github.com/cz-jcode/interest-compounder" target="_blank" rel="noreferrer">GitHub</a>
+      <a class="gh-link" href="https://github.com/cz-jcode/interest-compounder" target="_blank" rel="noreferrer" aria-label="GitHub">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M12 .5a12 12 0 0 0-3.79 23.4c.6.11.82-.26.82-.58v-2.03c-3.34.73-4.04-1.61-4.04-1.61-.55-1.39-1.34-1.76-1.34-1.76-1.1-.75.08-.73.08-.73 1.22.09 1.87 1.26 1.87 1.26 1.08 1.85 2.83 1.31 3.52 1 .11-.79.42-1.31.76-1.61-2.66-.31-5.46-1.33-5.46-5.92 0-1.31.47-2.38 1.25-3.22-.13-.31-.54-1.57.12-3.27 0 0 1.01-.32 3.3 1.23a11.5 11.5 0 0 1 6 0c2.28-1.55 3.29-1.23 3.29-1.23.66 1.7.25 2.96.12 3.27.78.84 1.24 1.91 1.24 3.22 0 4.61-2.8 5.6-5.47 5.91.43.38.81 1.12.81 2.26v3.35c0 .32.22.69.83.58A12 12 0 0 0 12 .5z"/>
+        </svg>
+        <span class="gh-text">GitHub</span>
+      </a>
     </div>
   </header>
 
   <main class="container">
-    <section class="panel inputs">
+    <section class="panel inputs" id="inputsPanel" aria-label="Inputs">
       <div class="panel-header tabs-header">
         <div class="tabs" role="tablist" aria-label="Input tabs">
           <button class="tab active" id="tabFormBtn" data-target="#tabForm" role="tab" aria-controls="tabForm" aria-selected="true" data-i18n="tab.form">Form</button>
           <button class="tab" id="tabEditorBtn" data-target="#tabEditor" role="tab" aria-controls="tabEditor" aria-selected="false" data-i18n="tab.editor">Source</button>
         </div>
       </div>
-
 
       <div id="tabForm" class="tab-panel" role="tabpanel">
         <div id="formHint" class="hint" hidden data-i18n="form.hintMulti">The form now supports multiple calculations. You can add/remove and edit them all here. The YAML/JSON editor stays in sync.</div>
@@ -51,7 +62,6 @@
       <div id="tabEditor" class="tab-panel" role="tabpanel" hidden>
         <div class="controls" style="margin-bottom:8px; display:flex; gap:8px; align-items:center;">
           <button id="formatBtn" title="Format content" data-i18n="btn.format">Format</button>
-          <button id="resetBtn" title="Restore sample input" data-i18n="btn.reset">Reset</button>
           <div class="mode" title="Toggle JSON/YAML (for Editor)" data-i18n-title="toggle.modeTitle" role="group" aria-label="Mode">
             <label><input type="radio" name="modeRadio" id="modeYaml" value="yaml" checked> YAML</label>
             <label><input type="radio" name="modeRadio" id="modeJson" value="json"> JSON</label>
@@ -63,10 +73,15 @@
       </div>
     </section>
 
-    <section class="panel outputs">
+    <div id="splitter" class="splitter" role="separator" aria-orientation="vertical" aria-label="Resize panels" aria-controls="inputsPanel outputsPanel">
+      <button id="collapseBtn" class="collapse-btn" title="Collapse inputs" aria-label="Collapse inputs" aria-expanded="true">◀</button>
+    </div>
+
+    <section class="panel outputs" id="outputsPanel">
       <div class="panel-header">
         <h2 data-i18n="outputs">Output & Charts</h2>
         <div class="controls">
+          <button id="copyOutBtn" class="icon-btn" title="Copy output JSON" data-i18n-title="out.copyTitle" aria-label="Copy output JSON">📋</button>
           <label for="viewSelect" data-i18n="view.label">View:</label>
           <select id="viewSelect">
             <option value="months" data-i18n="view.months">Months</option>
@@ -76,15 +91,10 @@
       </div>
 
       <div id="chartsContainer" class="charts-container">
-        <canvas id="chart"></canvas>
         <div id="legend" class="chart-legend" aria-live="polite"></div>
+        <canvas id="chart"></canvas>
         <div id="legendHover" class="legend-hover" hidden></div>
       </div>
-
-      <details class="raw">
-        <summary data-i18n="raw.title">Raw response</summary>
-        <pre id="rawOut" class="code"></pre>
-      </details>
     </section>
   </main>
 

@@ -42,6 +42,8 @@ const I18N = {
     'legend.months': 'Měsíce',
     'legend.recurring': 'Pravidelné',
     'legend.oneTime': 'Jednorázové',
+    'legend.totals': 'Souhrny',
+    'legend.balance': 'Zůstatek',
     'form.name': 'Název',
     'form.currency': 'Měna',
     'btn.expand': 'Rozbalit',
@@ -63,6 +65,8 @@ const I18N = {
     'repo.copied': 'Zdroj zkopírován do schránky.',
     'repo.downloaded': 'Stahování zahájeno.',
     'repo.noNames': 'Zatím žádné uložené sady.',
+    'out.copyTitle': 'Zkopírovat JSON výstupu (kopie výstupu)',
+    'out.copied': 'JSON výstupu zkopírován do schránky.'
   },
   en: {
     title: 'Compound Calculator UI',
@@ -104,6 +108,8 @@ const I18N = {
     'legend.months': 'Months',
     'legend.recurring': 'Recurring',
     'legend.oneTime': 'One-time',
+    'legend.totals': 'Totals',
+    'legend.balance': 'Balance',
     'form.name': 'Name',
     'form.currency': 'Currency',
     'btn.expand': 'Expand',
@@ -125,6 +131,8 @@ const I18N = {
     'repo.copied': 'Source copied to clipboard.',
     'repo.downloaded': 'Download started.',
     'repo.noNames': 'No saved sets yet.',
+    'out.copyTitle': 'Copy output JSON (copy of output)',
+    'out.copied': 'Output JSON copied to clipboard.'
   },
   de: {
     title: 'Zinseszins Rechner UI',
@@ -166,6 +174,8 @@ const I18N = {
     'legend.months': 'Monate',
     'legend.recurring': 'Regelmäßig',
     'legend.oneTime': 'Einmalig',
+    'legend.totals': 'Summen',
+    'legend.balance': 'Saldo',
     'form.name': 'Name',
     'form.currency': 'Währung',
     'btn.expand': 'Ausklappen',
@@ -187,6 +197,8 @@ const I18N = {
     'repo.copied': 'Quelle in die Zwischenablage kopiert.',
     'repo.downloaded': 'Download gestartet.',
     'repo.noNames': 'Noch keine gespeicherten Sätze.',
+    'out.copyTitle': 'Antwort-JSON kopieren (Kopie der Ausgabe)',
+    'out.copied': 'Antwort-JSON in die Zwischenablage kopiert.'
   }
 };
 let currentLang = 'en';
@@ -294,6 +306,8 @@ const sample = { calculations: [ sampleItem, { ...sampleItem, name: 'Calculation
 
 let mode = 'yaml'; // default 'yaml' | 'json'
 let editor, chart, hoverStackId = null;
+let lastBatchJSON = '';
+let lastFormEditTs = 0; // timestamp of last form-driven edit to suppress echo from editor change
 let currentInput = structuredClone ? structuredClone(sample) : JSON.parse(JSON.stringify(sample));
 let prevMonths = null;
 let collapsedState = []; // per-calc collapsed state
@@ -315,7 +329,9 @@ function initEditor() {
   setTimeout(()=>{ try{ editor && editor.resize(); }catch{} }, 0);
 }
 
+let editorProgrammatic = false;
 function setEditorValueFromObject(obj) {
+  editorProgrammatic = true;
   if (mode === 'json') {
     editor.session.setMode('ace/mode/json');
     editor.setValue(JSON.stringify(obj, null, 2), -1);
@@ -324,6 +340,8 @@ function setEditorValueFromObject(obj) {
     const y = jsyaml.dump(obj, { noRefs: true, lineWidth: 80 });
     editor.setValue(y, -1);
   }
+  // release the guard after Ace processes the change cycle
+  setTimeout(()=>{ editorProgrammatic = false; }, 0);
 }
 
 function readEditorAsObject() {
@@ -399,8 +417,13 @@ async function computeFromState() {
 }
 
 const computeDebounced = debounce(computeFromState, 400);
+const syncEditorDebounced = debounce(() => {
+  try { setEditorValueFromObject(currentInput); } catch {}
+}, 300);
 
 function onEditorChanged() {
+  // Ignore echoes from our own programmatic updates
+  if (editorProgrammatic) return;
   const obj = readEditorAsObject();
   if (!obj) return;
   currentInput = normalizeBatch(obj);
@@ -412,7 +435,7 @@ function round2(x){ return Math.round((x + Number.EPSILON) * 100) / 100; }
 
 function renderOutputBatch(batchResp) {
   const pairs = Array.isArray(batchResp.results) ? batchResp.results : [];
-  document.getElementById('rawOut').textContent = JSON.stringify(batchResp, null, 2);
+  lastBatchJSON = JSON.stringify(batchResp, null, 2);
 
   // Determine max months across calculations (for auto mode)
   let maxMonths = 0;
@@ -475,23 +498,31 @@ function drawStackedGroupedMonths(pairs){
     }
     const principalData = Array.from({length:maxM}, (_,i)=> monthly[i]? monthly[i].principal : 0);
     const interestData  = cumInterest;
+    const balancesData  = Array.from({length:maxM}, (_,i)=> monthly[i]? monthly[i].balance : 0);
     const color = palette[idx % palette.length];
     const name = calcDisplayName(req, idx);
+    const cur = req.currency || (currentLang==='cs' ? 'CZK' : (currentLang==='de' ? 'EUR' : 'USD'));
     datasets.push({
-      label: `${name} – ${t('legend.principal')}`,
+      label: t('legend.principal'),
       data: principalData,
       backgroundColor: withAlpha(color, 0.7),
       borderColor: color,
       stack: 'calc'+idx,
-      currency: req.currency || (currentLang==='cs' ? 'CZK' : (currentLang==='de' ? 'EUR' : 'USD')),
+      currency: cur,
+      calcName: name,
+      balances: balancesData,
+      periodType: 'month'
     });
     datasets.push({
-      label: `${name} – ${t('legend.interest')}`,
+      label: t('legend.interest'),
       data: interestData,
       backgroundColor: withAlpha(color, 0.35),
       borderColor: withAlpha(color, 0.5),
       stack: 'calc'+idx,
-      currency: req.currency || (currentLang==='cs'?'CZK':'USD'),
+      currency: cur,
+      calcName: name,
+      balances: balancesData,
+      periodType: 'month'
     });
   });
   renderBarChart(labels, datasets, `${t('chart.months')}`);
@@ -522,25 +553,32 @@ function drawStackedGroupedYears(pairs){
   yearsArrays.forEach((arr, idx)=>{
     const principalData = Array.from({length:maxY}, (_,i)=> arr[i]? arr[i].principal : 0);
     const interestData  = Array.from({length:maxY}, (_,i)=> arr[i]? arr[i].interestCum : 0);
+    const balancesData  = Array.from({length:maxY}, (_,i)=> arr[i]? arr[i].balance : 0);
     const color = palette[idx % palette.length];
     const req = pairs[idx]?.request || {};
     const name = calcDisplayName(req, idx);
     const cur = req.currency || (currentLang==='cs' ? 'CZK' : (currentLang==='de' ? 'EUR' : 'USD'));
     datasets.push({
-      label: `${name} – ${t('legend.principal')}`,
+      label: t('legend.principal'),
       data: principalData,
       backgroundColor: withAlpha(color, 0.7),
       borderColor: color,
       stack: 'calc'+idx,
       currency: cur,
+      calcName: name,
+      balances: balancesData,
+      periodType: 'year'
     });
     datasets.push({
-      label: `${name} – ${t('legend.interest')}`,
+      label: t('legend.interest'),
       data: interestData,
       backgroundColor: withAlpha(color, 0.35),
       borderColor: withAlpha(color, 0.5),
       stack: 'calc'+idx,
       currency: cur,
+      calcName: name,
+      balances: balancesData,
+      periodType: 'year'
     });
   });
   renderBarChart(labels, datasets, `${t('chart.years')}`);
@@ -552,36 +590,45 @@ function renderLegend(pairs){
   if (!legendEl) return;
   const palette = basePalette();
   legendEl.innerHTML = '';
+  let count = 0;
   pairs.forEach((p, idx)=>{
     const req = p.request || {};
+    const res = p.response || {};
+    const totals = res.totals || {};
     const color = palette[idx % palette.length];
     const item = document.createElement('div');
     const cur = req.currency || (currentLang==='cs' ? 'CZK' : (currentLang==='de' ? 'EUR' : 'USD'));
     const name = calcDisplayName(req, idx);
+    const totalsText = `${t('legend.totals')}: ${t('legend.principal')}: ${moneyWith(totals.principal||0, cur)} · ${t('legend.interest')}: ${moneyWith(totals.interest||0, cur)} · ${t('legend.balance')}: ${moneyWith(totals.balance||0, cur)}`;
     item.className = 'legend-item';
     item.setAttribute('data-idx', String(idx));
     item.innerHTML = `
       <span class="swatch" style="background:${withAlpha(color, 0.8)}; border-color:${color}"></span>
-      <span class="legend-text">${name}: ${moneyWith(req.initialPrincipal||0, cur)} · ${t('legend.rate')}: ${numberFmt(req.annualRate||0)} · ${t('legend.months')}: ${req.totalMonths||0}</span>
+      <span class="legend-text">${name}: ${moneyWith(req.initialPrincipal||0, cur)} · ${t('legend.rate')}: ${numberFmt(req.annualRate||0)} · ${t('legend.months')}: ${req.totalMonths||0} — ${totalsText}</span>
     `;
     item.addEventListener('mouseenter', (ev)=>{
       if (!hover) return;
-      hover.innerHTML = buildLegendHover(req, idx, color);
+      hover.innerHTML = buildLegendHover(req, idx, color, totals);
       hover.hidden = false;
       positionHover(hover, ev);
     });
     item.addEventListener('mousemove', (ev)=>{ if (hover && !hover.hidden) positionHover(hover, ev); });
     item.addEventListener('mouseleave', ()=>{ if (hover) hover.hidden = true; });
     legendEl.appendChild(item);
+    count++;
   });
+  legendEl.classList.toggle('scroll', count > 5);
+  // After legend reflow, adjust chart height to keep page non-scrolling
+  fitChartHeight();
 }
-function buildLegendHover(req, idx, color){
+function buildLegendHover(req, idx, color, totals){
   const rec = Array.isArray(req.recurring)? req.recurring : [];
   const one = Array.isArray(req.oneTime)? req.oneTime : [];
   const cur = req.currency || (currentLang==='cs' ? 'CZK' : (currentLang==='de' ? 'EUR' : 'USD'));
   const recList = rec.map(r=>`<li>${r.schedule||'monthly'} · ${moneyWith(r.amount||0, cur)} · ${r.startMonth||0}→${(r.endMonth??-1)}</li>`).join('') || '<li>–</li>';
   const oneList = one.map(o=>`<li>${moneyWith(o.amount||0, cur)} @ M${o.atMonth||0}</li>`).join('') || '<li>–</li>';
   const name = calcDisplayName(req, idx);
+  const tot = totals||{};
   return `
     <div class="legend-hover-inner">
       <div class="legend-hover-header">
@@ -591,6 +638,7 @@ function buildLegendHover(req, idx, color){
       <div class="row"><span>${t('form.initial')}:</span><span>${moneyWith(req.initialPrincipal||0, cur)}</span></div>
       <div class="row"><span>${t('legend.rate')}:</span><span>${numberFmt(req.annualRate||0)}</span></div>
       <div class="row"><span>${t('legend.months')}:</span><span>${req.totalMonths||0}</span></div>
+      <div class="row"><span>${t('legend.totals')}:</span><span>${t('legend.principal')}: ${moneyWith(tot.principal||0, cur)} · ${t('legend.interest')}: ${moneyWith(tot.interest||0, cur)} · ${t('legend.balance')}: ${moneyWith(tot.balance||0, cur)}</span></div>
       <div class="row"><span>${t('form.recurring')}:</span></div>
       <ul class="mini">${recList}</ul>
       <div class="row"><span>${t('form.oneTime')}:</span></div>
@@ -622,6 +670,7 @@ function renderBarChart(labels, datasets, title){
   const data = { labels, datasets };
   const options = {
     responsive: true,
+    maintainAspectRatio: false,
     interaction: { mode: 'index', intersect: true },
     onHover: (evt, elements, c) => {
       // Use precise hit-test to find the nearest element under cursor, not just the first active
@@ -666,9 +715,25 @@ function renderBarChart(labels, datasets, title){
           return true;
         },
         callbacks: {
+          title: (items) => {
+            if (!items || items.length === 0) return '';
+            const ds = items[0].dataset || {};
+            return ds.calcName || '';
+          },
           label: (ctx)=> {
             const cur = ctx.dataset.currency || (currentLang==='cs' ? 'CZK' : (currentLang==='de' ? 'EUR' : 'USD'));
             return `${ctx.dataset.label}: ${moneyWith(ctx.parsed.y, cur)}`;
+          },
+          afterBody: (items)=>{
+            if (!items || items.length === 0) return [];
+            const it = items[0];
+            const ds = it.dataset || {};
+            const idx = it.dataIndex;
+            const cur = ds.currency || (currentLang==='cs' ? 'CZK' : (currentLang==='de' ? 'EUR' : 'USD'));
+            const balances = ds.balances || [];
+            const bal = typeof balances[idx] === 'number' ? balances[idx] : 0;
+            const line = `${t('legend.balance')}: ${moneyWith(bal, cur)}`;
+            return [line];
           }
         }
       }
@@ -677,6 +742,8 @@ function renderBarChart(labels, datasets, title){
   };
   if (chart) chart.destroy();
   chart = new Chart(ctx, { type: 'bar', data, options });
+  // Adjust canvas height after chart render to prevent page scroll
+  fitChartHeight();
 }
 
 function setActiveTab(which){
@@ -698,6 +765,7 @@ function setActiveTab(which){
   if (!isForm){
     setTimeout(()=>{ try{ editor && editor.resize(); }catch{} }, 0);
   }
+  setTimeout(()=>{ try{ fitChartHeight(); }catch{} }, 0);
 }
 function bindTabs(){
   const btnEditor = document.getElementById('tabEditorBtn');
@@ -832,6 +900,17 @@ function renderFormMulti(){
   });
 }
 
+function decimalsFromStep(stepStr){
+  if (!stepStr) return 0;
+  const m = String(stepStr).split('.');
+  return m.length>1 ? (m[1].length||0) : 0;
+}
+function formatNumberForInput(val, stepStr){
+  if (typeof val !== 'number' || !isFinite(val)) return '';
+  const d = decimalsFromStep(stepStr);
+  return d>0 ? val.toFixed(d) : String(Math.trunc(val));
+}
+
 function bindForm(){
   // Add calculation button
   document.getElementById('addCalcBtn').addEventListener('click', ()=>{
@@ -864,13 +943,23 @@ function bindForm(){
     const it = b.calculations[cidx];
     const field = e.target.getAttribute('data-field');
     const rIdx = parseInt(e.target.getAttribute('data-idx'));
+    // Update in-memory model without re-rendering the form or editor immediately
     if (e.target.classList.contains('top-field')){
       if (field === 'name') {
         it.name = String(e.target.value||'');
       } else if (field === 'currency') {
-        it.currency = e.target.value || (currentLang==='cs'?'CZK':'USD');
+        it.currency = e.target.value || (currentLang==='cs'?'CZK':(currentLang==='de'?'EUR':'USD'));
       } else {
-        const val = field==='annualRate' ? parseFloat(e.target.value)||0 : (field==='totalMonths'? parseInt(e.target.value)||0 : parseFloat(e.target.value)||0);
+        const raw = e.target.value;
+        // loose parsing: allow transient states like '', '-', '0.', etc.; keep previous if NaN
+        let val;
+        if (field === 'totalMonths') {
+          const parsed = parseInt(raw);
+          val = Number.isNaN(parsed) ? it.totalMonths : parsed;
+        } else {
+          const parsed = parseFloat(raw);
+          val = Number.isNaN(parsed) ? it[field] : parsed;
+        }
         it[field] = val;
       }
     } else if (!Number.isNaN(rIdx)) {
@@ -878,17 +967,29 @@ function bindForm(){
         if (e.target.tagName==='SELECT') {
           it.recurring[rIdx][field] = e.target.value;
         } else {
-          const v = field==='amount'? parseFloat(e.target.value)||0 : parseInt(e.target.value);
-          it.recurring[rIdx][field] = (field==='endMonth' && (v===undefined||v===null||Number.isNaN(v)))? -1 : (Number.isNaN(v)?0:v);
+          const raw = e.target.value;
+          if (field==='amount'){
+            const p = parseFloat(raw);
+            it.recurring[rIdx][field] = Number.isNaN(p) ? (it.recurring[rIdx][field]||0) : p;
+          } else {
+            const p = parseInt(raw);
+            it.recurring[rIdx][field] = (field==='endMonth' && (p===undefined||p===null||Number.isNaN(p)))? -1 : (Number.isNaN(p)? (it.recurring[rIdx][field]||0) : p);
+          }
         }
       } else { // one-time
-        const v = field==='amount'? parseFloat(e.target.value)||0 : parseInt(e.target.value)||0;
-        it.oneTime[rIdx][field] = v;
+        const raw = e.target.value;
+        if (field==='amount'){
+          const p = parseFloat(raw);
+          it.oneTime[rIdx][field] = Number.isNaN(p) ? (it.oneTime[rIdx][field]||0) : p;
+        } else {
+          const p = parseInt(raw);
+          it.oneTime[rIdx][field] = Number.isNaN(p) ? (it.oneTime[rIdx][field]||0) : p;
+        }
       }
     }
     currentInput = b;
-    setEditorValueFromObject(currentInput);
-    renderFormMulti(); // re-render to update headers/summary
+    // Only debounce-sync editor text (non-destructive) and recompute charts; do not re-render form here
+    syncEditorDebounced();
     computeDebounced();
   });
 
@@ -935,6 +1036,60 @@ function bindForm(){
       currentInput = b; setEditorValueFromObject(currentInput); renderFormMulti(); computeDebounced();
     }
   });
+
+  // On change/blur: normalize value string and refresh summaries
+  function normalizeFieldValue(target, model, field){
+    if (!target) return;
+    const step = target.getAttribute('step')||'';
+    if (field==='name' || field==='currency') return;
+    if (field==='totalMonths'){
+      const v = parseInt(target.value);
+      const n = Number.isNaN(v) ? (model.totalMonths||0) : v;
+      model.totalMonths = n;
+      target.value = formatNumberForInput(n, step || '1');
+    } else if (field){
+      const v = parseFloat(target.value);
+      const n = Number.isNaN(v) ? (model[field]||0) : v;
+      model[field] = n;
+      target.value = formatNumberForInput(n, step||'0.01');
+    }
+  }
+  const formEl = document.getElementById('formMulti');
+  formEl.addEventListener('change', (e)=>{
+    const target = e.target;
+    const cidx = parseInt(target.getAttribute('data-cidx'));
+    if (Number.isNaN(cidx)) return;
+    const b = normalizeBatch(currentInput);
+    const it = b.calculations[cidx];
+    const field = target.getAttribute('data-field');
+    const rIdx = parseInt(target.getAttribute('data-idx'));
+    if (target.classList.contains('top-field')){
+      normalizeFieldValue(target, it, field);
+    } else if (!Number.isNaN(rIdx)){
+      if (target.closest('table').classList.contains('rec')){
+        if (target.tagName==='SELECT'){
+          // already handled on input
+        } else {
+          const row = it.recurring[rIdx];
+          normalizeFieldValue(target, row, field);
+        }
+      } else {
+        const row = it.oneTime[rIdx];
+        normalizeFieldValue(target, row, field);
+      }
+    }
+    currentInput = b;
+    setEditorValueFromObject(currentInput);
+    renderFormMulti();
+    computeDebounced();
+  });
+
+  formEl.addEventListener('blur', (e)=>{
+    if (!e.target || !e.target.matches('input, select')) return;
+    // trigger change-like normalization on blur
+    const evt = new Event('change', { bubbles: true });
+    e.target.dispatchEvent(evt);
+  }, true);
 }
 
 function syncEditorAndCompute(){
@@ -943,6 +1098,8 @@ function syncEditorAndCompute(){
 }
 
 function hookUI() {
+  // Init splitter & collapse after DOM is ready
+  setTimeout(initSplitter, 0);
   // Tabs
   bindTabs();
   // Language
@@ -950,7 +1107,7 @@ function hookUI() {
   const stored = localStorage.getItem('lang')||'auto';
   if (langSel) langSel.value = stored;
   currentLang = getLang(); updateLocale(); applyI18n();
-  langSel.addEventListener('change', ()=>{ localStorage.setItem('lang', langSel.value); currentLang = getLang(); updateLocale(); applyI18n(); const raw = document.getElementById('rawOut').textContent; if (raw) { try { renderOutputBatch(JSON.parse(raw)); } catch(_){} } });
+  langSel.addEventListener('change', ()=>{ localStorage.setItem('lang', langSel.value); currentLang = getLang(); updateLocale(); applyI18n(); if (lastBatchJSON) { try { renderOutputBatch(JSON.parse(lastBatchJSON)); } catch(_){} } });
 
 
   // Editor mode radios (YAML/JSON)
@@ -981,9 +1138,8 @@ function hookUI() {
   });
   document.getElementById('viewSelect').addEventListener('change', (e) => {
     e.target.dataset.userSet = 'true';
-    const raw = document.getElementById('rawOut').textContent;
-    if (!raw) return;
-    try { renderOutputBatch(JSON.parse(raw)); } catch (_) {}
+    if (!lastBatchJSON) return;
+    try { renderOutputBatch(JSON.parse(lastBatchJSON)); } catch (_) {}
   });
 
   // Repo buttons
@@ -995,6 +1151,19 @@ function hookUI() {
   if (loadBtn) loadBtn.addEventListener('click', openLoadDialog);
   if (copyBtn) copyBtn.addEventListener('click', copySourceToClipboard);
   if (downloadBtn) downloadBtn.addEventListener('click', downloadSourceToFile);
+  // Output JSON copy (clipboard) in Outputs header
+  const copyOutBtn = document.getElementById('copyOutBtn');
+  if (copyOutBtn) copyOutBtn.addEventListener('click', async ()=>{
+    if (!lastBatchJSON) { try{ alert('No output yet'); }catch{} return; }
+    try{
+      if (navigator.clipboard && navigator.clipboard.writeText){
+        await navigator.clipboard.writeText(lastBatchJSON);
+        alert(t('out.copied'));
+      } else {
+        fallbackCopy(lastBatchJSON);
+      }
+    }catch{ fallbackCopy(lastBatchJSON); }
+  });
 
   const saveConfirm = document.getElementById('saveConfirmBtn');
   const saveCancel = document.getElementById('saveCancelBtn');
@@ -1020,7 +1189,7 @@ function hookUI() {
     }
   });
   // Resize Ace on window resize
-  window.addEventListener('resize', debounce(()=>{ try{ editor && editor.resize(); }catch{} }, 100));
+  window.addEventListener('resize', debounce(()=>{ try{ editor && editor.resize(); }catch{} try{ fitChartHeight(); }catch{} }, 100));
 
   // Form bindings
   bindForm();
@@ -1139,6 +1308,83 @@ function downloadSourceToFile(){
   try { alert(t('repo.downloaded')); } catch{}
 }
 
+// --- Splitter (40/60 with drag + collapse) ---
+const SPLIT_KEY = 'ui.split.inputsWidth';
+const SPLIT_COLLAPSE_KEY = 'ui.split.collapsed';
+function clamp(v, min, max){ return Math.min(max, Math.max(min, v)); }
+function initSplitter(){
+  const container = document.querySelector('main.container');
+  const inputs = document.getElementById('inputsPanel');
+  const outputs = document.getElementById('outputsPanel');
+  const splitter = document.getElementById('splitter');
+  const collapseBtn = document.getElementById('collapseBtn');
+  if (!container || !inputs || !outputs || !splitter) return;
+
+  // Restore persisted state
+  const stored = parseFloat(localStorage.getItem(SPLIT_KEY));
+  const collapsed = localStorage.getItem(SPLIT_COLLAPSE_KEY) === '1';
+  let basis = (!Number.isNaN(stored) && stored>0) ? stored : 40; // percent
+  if (collapsed) {
+    inputs.classList.add('collapsed');
+    splitter.classList.add('docked-left');
+    if (collapseBtn){ collapseBtn.setAttribute('aria-expanded','false'); collapseBtn.textContent = '▶'; }
+  } else {
+    inputs.style.flexBasis = basis + '%';
+    splitter.classList.remove('docked-left');
+    if (collapseBtn){ collapseBtn.setAttribute('aria-expanded','true'); collapseBtn.textContent = '◀'; }
+  }
+
+  function applyWidth(pct){
+    if (inputs.classList.contains('collapsed')) return;
+    basis = clamp(pct, 15, 70); // keep graph dominant
+    inputs.style.flexBasis = basis + '%';
+    localStorage.setItem(SPLIT_KEY, String(basis));
+    // Let charts and editor adapt
+    try { if (chart) chart.resize(); } catch{}
+    try { if (editor) editor.resize(); } catch{}
+    try { fitChartHeight(); } catch{}
+  }
+
+  let dragging = false;
+  function onMove(clientX){
+    const rect = container.getBoundingClientRect();
+    const x = clamp(clientX - rect.left, 100, rect.width - 100);
+    const pct = (x / rect.width) * 100;
+    applyWidth(pct);
+  }
+  splitter.addEventListener('mousedown', (e)=>{ dragging = true; e.preventDefault(); });
+  window.addEventListener('mousemove', (e)=>{ if (dragging) onMove(e.clientX); });
+  window.addEventListener('mouseup', ()=>{ dragging = false; });
+  // Touch
+  splitter.addEventListener('touchstart', (e)=>{ dragging = true; });
+  window.addEventListener('touchmove', (e)=>{ if (!dragging) return; const t = e.touches[0]; if (t) onMove(t.clientX); });
+  window.addEventListener('touchend', ()=>{ dragging = false; });
+
+  // Collapse/expand
+  if (collapseBtn){
+    collapseBtn.addEventListener('click', ()=>{
+      const isCollapsed = inputs.classList.toggle('collapsed');
+      splitter.classList.toggle('docked-left', isCollapsed);
+      if (isCollapsed){
+        collapseBtn.setAttribute('aria-expanded','false');
+        collapseBtn.textContent = '▶';
+        localStorage.setItem(SPLIT_COLLAPSE_KEY, '1');
+      } else {
+        collapseBtn.setAttribute('aria-expanded','true');
+        collapseBtn.textContent = '◀';
+        localStorage.setItem(SPLIT_COLLAPSE_KEY, '0');
+        // Ensure some width applied
+        const restore = parseFloat(localStorage.getItem(SPLIT_KEY));
+        applyWidth((!Number.isNaN(restore)&&restore>0)? restore : 40);
+      }
+      // Resize dependents
+      try { if (chart) chart.resize(); } catch{}
+      try { if (editor) editor.resize(); } catch{}
+      try { fitChartHeight(); } catch{}
+    });
+  }
+}
+
 function main() {
   initEditor();
   hookUI();
@@ -1147,3 +1393,24 @@ function main() {
 }
 
 window.addEventListener('DOMContentLoaded', main);
+
+
+// Dynamically size the chart canvas so the legend remains visible above without causing page scroll
+function fitChartHeight(){
+  try{
+    const container = document.getElementById('chartsContainer');
+    const canvas = document.getElementById('chart');
+    const legend = document.getElementById('legend');
+    if (!container || !canvas) return;
+    // charts-container uses flex column with gap:16px in CSS
+    const GAP = 16;
+    const containerHeight = container.clientHeight; // visible height available for legend + canvas
+    const legendHeight = legend ? legend.offsetHeight : 0;
+    // Reserve one gap between legend and canvas if both present
+    const reserved = legendHeight + (legendHeight > 0 ? GAP : 0);
+    // Keep sensible minimum for canvas
+    const target = Math.max(140, containerHeight - reserved);
+    canvas.style.height = target + 'px';
+    try { if (typeof chart !== 'undefined' && chart) chart.resize(); } catch {}
+  } catch {}
+}
