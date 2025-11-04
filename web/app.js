@@ -305,7 +305,7 @@ const sampleItem = {
 const sample = { calculations: [ sampleItem, { ...sampleItem, name: 'Calculation 2', annualRate: 0.05, initialPrincipal: 5000, totalMonths: 60, recurring: [ { schedule: 'monthly', amount: 100, startMonth: 0, endMonth: -1 } ], oneTime: [] } ] };
 
 let mode = 'yaml'; // default 'yaml' | 'json'
-let editor, chart, hoverStackId = null;
+let editor, chart, hoverStackId = null, hoverCalcName = null, hoverIndex = null;
 let lastBatchJSON = '';
 let lastFormEditTs = 0; // timestamp of last form-driven edit to suppress echo from editor change
 let currentInput = structuredClone ? structuredClone(sample) : JSON.parse(JSON.stringify(sample));
@@ -671,27 +671,34 @@ function renderBarChart(labels, datasets, title){
   const options = {
     responsive: true,
     maintainAspectRatio: false,
-    interaction: { mode: 'index', intersect: true },
+    interaction: { mode: 'index', intersect: false },
     onHover: (evt, elements, c) => {
-      // Use precise hit-test to find the nearest element under cursor, not just the first active
+      // Detect hovered column by X-axis position only (month/year index), then pick 1 nearest calculation within that column
       try {
-        const nearest = c.getElementsAtEventForMode(evt, 'nearest', { intersect: true }, true);
-        if (nearest && nearest.length > 0) {
-          const di = nearest[0].datasetIndex;
+        const atIndex = c.getElementsAtEventForMode(evt, 'index', { intersect: false }, true);
+        if (atIndex && atIndex.length > 0) {
+          // All elements share the same dataIndex
+          hoverIndex = atIndex[0].index;
+          // Choose the element whose bar center (element.x) is closest to cursor X
+          let best = atIndex[0];
+          let bestDx = Number.POSITIVE_INFINITY;
+          for (const el of atIndex) {
+            const x = el.element && typeof el.element.x === 'number' ? el.element.x : null;
+            if (x != null && typeof evt.x === 'number') {
+              const dx = Math.abs(x - evt.x);
+              if (dx < bestDx) { bestDx = dx; best = el; }
+            }
+          }
+          const di = best.datasetIndex;
           const ds = c.data?.datasets?.[di];
-          hoverStackId = ds?.stack || null;
+          hoverCalcName = ds?.calcName || null;
         } else {
-          hoverStackId = null;
+          hoverIndex = null;
+          hoverCalcName = null;
         }
       } catch (_) {
-        // Fallback to active elements if needed
-        if (elements && elements.length > 0) {
-          const di = elements[0].datasetIndex;
-          const ds = c.data?.datasets?.[di];
-          hoverStackId = ds?.stack || null;
-        } else {
-          hoverStackId = null;
-        }
+        hoverIndex = null;
+        hoverCalcName = null;
       }
     },
     plugins: {
@@ -703,14 +710,15 @@ function renderBarChart(labels, datasets, title){
           const datasets = chart.data?.datasets || [];
           const ds = datasets[ti.datasetIndex];
           if (!ds) return false;
-          if (hoverStackId) {
-            return ds.stack === hoverStackId;
+          // Highlight entire calculation only
+          if (hoverCalcName) {
+            return ds.calcName === hoverCalcName;
           }
-          // Fallback: try active elements as last resort
+          // Fallback: try active element's calculation
           const active = chart.getActiveElements ? chart.getActiveElements() : (chart._active || []);
           if (active && active.length > 0) {
             const activeDs = datasets[active[0].datasetIndex];
-            return activeDs && activeDs.stack === ds.stack;
+            return activeDs && activeDs.calcName === ds.calcName;
           }
           return true;
         },
