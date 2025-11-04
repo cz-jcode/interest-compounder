@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="cs">
+<html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -11,18 +11,19 @@
 </head>
 <body>
   <header class="topbar">
-    <h1 data-i18n="header">Investiční kalkulačka (měsíční úročení)</h1>
+    <h1 data-i18n="header">Investment Calculator (monthly compounding)</h1>
     <div class="right">
       <!-- Project-level repository controls -->
       <div class="repo-controls">
-        <button id="saveRepoBtn" title="Uložit do úložiště prohlížeče" data-i18n="repo.save">Uložit</button>
-        <button id="loadRepoBtn" title="Načíst ze úložiště" data-i18n="repo.load">Načíst</button>
-        <button id="copyBtn" title="Zkopírovat zdroj do schránky" data-i18n="repo.copy">Kopírovat</button>
-        <button id="downloadBtn" title="Stáhnout zdroj jako soubor" data-i18n="repo.download">Stáhnout</button>
+        <button id="saveRepoBtn" data-i18n="repo.save" data-i18n-title="repo.saveTitle" title="Save source">Save</button>
+        <button id="loadRepoBtn" data-i18n="repo.load" data-i18n-title="repo.loadTitle" title="Load source">Load</button>
+        <button id="copyBtn" data-i18n="repo.copy" title="Copy source to clipboard">Copy</button>
+        <button id="downloadBtn" data-i18n="repo.download" title="Download current source">Download</button>
       </div>
       <select id="langSelect" title="Language">
         <option value="auto" data-i18n="lang.auto">Auto</option>
         <option value="cs">Česky</option>
+        <option value="de">Deutsch</option>
         <option value="en">English</option>
       </select>
       <a href="https://github.com/cz-jcode/interest-compounder" target="_blank" rel="noreferrer">GitHub</a>
@@ -33,43 +34,43 @@
     <section class="panel inputs">
       <div class="panel-header tabs-header">
         <div class="tabs" role="tablist" aria-label="Input tabs">
-          <button class="tab active" id="tabFormBtn" data-target="#tabForm" role="tab" aria-controls="tabForm" aria-selected="true" data-i18n="tab.form">Formulář</button>
-          <button class="tab" id="tabEditorBtn" data-target="#tabEditor" role="tab" aria-controls="tabEditor" aria-selected="false" data-i18n="tab.editor">Zdroj</button>
+          <button class="tab active" id="tabFormBtn" data-target="#tabForm" role="tab" aria-controls="tabForm" aria-selected="true" data-i18n="tab.form">Form</button>
+          <button class="tab" id="tabEditorBtn" data-target="#tabEditor" role="tab" aria-controls="tabEditor" aria-selected="false" data-i18n="tab.editor">Source</button>
         </div>
       </div>
 
 
       <div id="tabForm" class="tab-panel" role="tabpanel">
-        <div id="formHint" class="hint" hidden data-i18n="form.hintMulti">Formulář nyní podporuje více kalkulací. Můžete přidat/odebrat kalkulaci a upravovat je všechny zde. Editor (YAML/JSON) zůstává plně synchronizovaný.</div>
+        <div id="formHint" class="hint" hidden data-i18n="form.hintMulti">The form now supports multiple calculations. You can add/remove and edit them all here. The YAML/JSON editor stays in sync.</div>
         <div class="controls" style="margin:8px 0; display:flex; gap:8px; align-items:center;">
-          <button id="addCalcBtn" data-i18n="btn.addCalc">Přidat kalkulaci</button>
+          <button id="addCalcBtn" data-i18n="btn.addCalc">Add calculation</button>
         </div>
         <div id="formMulti" class="form-multi"></div>
       </div>
 
       <div id="tabEditor" class="tab-panel" role="tabpanel" hidden>
         <div class="controls" style="margin-bottom:8px; display:flex; gap:8px; align-items:center;">
-          <button id="formatBtn" title="Naformátovat obsah" data-i18n="btn.format">Formátovat</button>
-          <button id="resetBtn" title="Obnovit ukázkový vstup" data-i18n="btn.reset">Reset</button>
-          <div class="mode" title="Přepnout JSON/YAML (pro Editor)" data-i18n-title="toggle.modeTitle" role="group" aria-label="Mode">
+          <button id="formatBtn" title="Format content" data-i18n="btn.format">Format</button>
+          <button id="resetBtn" title="Restore sample input" data-i18n="btn.reset">Reset</button>
+          <div class="mode" title="Toggle JSON/YAML (for Editor)" data-i18n-title="toggle.modeTitle" role="group" aria-label="Mode">
             <label><input type="radio" name="modeRadio" id="modeYaml" value="yaml" checked> YAML</label>
             <label><input type="radio" name="modeRadio" id="modeJson" value="json"> JSON</label>
           </div>
         </div>
         <div id="editor"></div>
-        <div class="hint" data-i18n="hint.editor">Úpravy se posílají na backend s prodlevou ~400 ms. Neznámá pole backend odmítne.</div>
+        <div class="hint" data-i18n="hint.editor">Edits are sent to backend with ~400 ms debounce. Unknown fields are rejected by backend.</div>
         <div id="errorBox" class="error" hidden></div>
       </div>
     </section>
 
     <section class="panel outputs">
       <div class="panel-header">
-        <h2 data-i18n="outputs">Výstup a grafy</h2>
+        <h2 data-i18n="outputs">Output & Charts</h2>
         <div class="controls">
-          <label for="viewSelect" data-i18n="view.label">Zobrazení:</label>
+          <label for="viewSelect" data-i18n="view.label">View:</label>
           <select id="viewSelect">
-            <option value="months" data-i18n="view.months">Měsíce</option>
-            <option value="years" data-i18n="view.years">Roky</option>
+            <option value="months" data-i18n="view.months">Months</option>
+            <option value="years" data-i18n="view.years">Years</option>
           </select>
         </div>
       </div>
@@ -81,7 +82,7 @@
       </div>
 
       <details class="raw">
-        <summary data-i18n="raw.title">Surová odpověď</summary>
+        <summary data-i18n="raw.title">Raw response</summary>
         <pre id="rawOut" class="code"></pre>
       </details>
     </section>

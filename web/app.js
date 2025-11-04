@@ -46,6 +46,7 @@ const I18N = {
     'form.currency': 'Měna',
     'btn.expand': 'Rozbalit',
     'btn.collapse': 'Sbalit',
+    'lang.auto': 'Automaticky',
     // repo/i18n
     'repo.save': 'Uložit',
     'repo.load': 'Načíst',
@@ -107,6 +108,7 @@ const I18N = {
     'form.currency': 'Currency',
     'btn.expand': 'Expand',
     'btn.collapse': 'Collapse',
+    'lang.auto': 'Auto',
     // repo/i18n
     'repo.save': 'Save',
     'repo.load': 'Load',
@@ -123,30 +125,101 @@ const I18N = {
     'repo.copied': 'Source copied to clipboard.',
     'repo.downloaded': 'Download started.',
     'repo.noNames': 'No saved sets yet.',
+  },
+  de: {
+    title: 'Zinseszins Rechner UI',
+    header: 'Investitionsrechner (monatliche Verzinsung)',
+    inputs: 'Eingabe',
+    'tab.editor': 'Quelle',
+    'tab.form': 'Formular',
+    'toggle.modeTitle': 'JSON/YAML umschalten (für Editor)',
+    'btn.format': 'Formatieren',
+    'btn.reset': 'Zurücksetzen',
+    'hint.editor': 'Änderungen werden mit ~400 ms Verzögerung gesendet. Unbekannte Felder werden vom Backend abgelehnt.',
+    outputs: 'Ausgabe & Diagramme',
+    'view.label': 'Ansicht:',
+    'view.months': 'Monate',
+    'view.years': 'Jahre',
+    'raw.title': 'Rohantwort',
+    'btn.addCalc': 'Berechnung hinzufügen',
+    'form.hintMulti': 'Das Formular unterstützt mehrere Berechnungen. Sie können alle hier hinzufügen/entfernen und bearbeiten. Der YAML/JSON-Editor bleibt synchron.',
+    'calc.title': 'Berechnung',
+    'form.initial': 'Anfangseinlage',
+    'form.rate': 'Jährlicher Zinssatz (z. B. 0.07)',
+    'form.months': 'Gesamtmonate',
+    'form.recurring': 'Regelmäßige Beiträge',
+    'th.freq': 'Frequenz',
+    'th.amount': 'Betrag',
+    'th.start': 'Start M',
+    'th.end': 'Ende M (-1=∞)',
+    'form.oneTime': 'Einmalige Beiträge',
+    'th.month': 'Monat',
+    'btn.addRecurring': 'Regelmäßigen hinzufügen',
+    'btn.addOneTime': 'Einmaligen hinzufügen',
+    'btn.delete': 'Löschen',
+    'chart.months': 'Monate',
+    'chart.years': 'Jahre',
+    'legend.principal': 'Einlage',
+    'legend.interest': 'Erhaltene Zinsen',
+    'legend.header': 'Eingabezusammenfassung',
+    'legend.rate': 'Zinssatz',
+    'legend.months': 'Monate',
+    'legend.recurring': 'Regelmäßig',
+    'legend.oneTime': 'Einmalig',
+    'form.name': 'Name',
+    'form.currency': 'Währung',
+    'btn.expand': 'Ausklappen',
+    'btn.collapse': 'Einklappen',
+    'lang.auto': 'Automatisch',
+    // repo/i18n
+    'repo.save': 'Speichern',
+    'repo.load': 'Laden',
+    'repo.copy': 'Kopieren',
+    'repo.download': 'Herunterladen',
+    'repo.saveTitle': 'Quelle speichern',
+    'repo.loadTitle': 'Quelle laden',
+    'repo.name': 'Name',
+    'repo.version': 'Version',
+    'repo.cancel': 'Abbrechen',
+    'repo.saveHint': 'Wenn der Name bereits existiert, wird eine neue Version erstellt. Überschreiben behält ältere Versionen bei.',
+    'repo.confirmOverwrite': 'Ein Satz mit diesem Namen existiert bereits. Neue Version unter diesem Namen erstellen?',
+    'repo.savedOk': 'Im Browserspeicher gespeichert.',
+    'repo.copied': 'Quelle in die Zwischenablage kopiert.',
+    'repo.downloaded': 'Download gestartet.',
+    'repo.noNames': 'Noch keine gespeicherten Sätze.',
   }
 };
-let currentLang = 'cs';
+let currentLang = 'en';
 function getLang(){
   const sel = document.getElementById('langSelect');
   const stored = localStorage.getItem('lang') || 'auto';
   const v = sel ? (sel.value||stored) : stored;
-  let lang = v==='auto' ? (navigator.language?.startsWith('cs') ? 'cs' : 'en') : v;
+  let lang;
+  if (v === 'auto') {
+    const nav = (navigator.language || navigator.userLanguage || '').toLowerCase();
+    if (nav.startsWith('cs')) lang = 'cs';
+    else if (nav.startsWith('de')) lang = 'de';
+    else lang = 'en';
+  } else {
+    lang = v;
+  }
   if (!I18N[lang]) lang = 'en';
   return lang;
 }
 function t(key){ return I18N[currentLang]?.[key] ?? key; }
 function applyI18n(){
   currentLang = getLang();
+  document.documentElement.setAttribute('lang', currentLang);
   document.querySelectorAll('[data-i18n]').forEach(el=>{ el.textContent = t(el.getAttribute('data-i18n')); });
   document.querySelectorAll('[data-i18n-title]').forEach(el=>{ el.setAttribute('title', t(el.getAttribute('data-i18n-title'))); });
 }
 
 // --- Utilities ---
-let currentLocale = 'cs-CZ';
-function updateLocale(){ currentLocale = (currentLang==='cs')? 'cs-CZ' : 'en-US'; }
+let currentLocale = 'en-US';
+function updateLocale(){ currentLocale = (currentLang==='cs')? 'cs-CZ' : (currentLang==='de' ? 'de-DE' : 'en-US'); }
 // Currency is now per calculation. Use helpers to format with given currency code.
 function moneyWith(v, currency){
-  const cur = typeof currency === 'string' && currency ? currency : (currentLang==='cs' ? 'CZK' : 'USD');
+  const cur = typeof currency === 'string' && currency ? currency : (currentLang==='cs' ? 'CZK' : (currentLang==='de' ? 'EUR' : 'USD'));
   return new Intl.NumberFormat(currentLocale, { style: 'currency', currency: cur, maximumFractionDigits: 2 }).format(v);
 }
 const fmtNumber = (v) => new Intl.NumberFormat(currentLocale, { maximumFractionDigits: 2 }).format(v);
@@ -204,7 +277,7 @@ function repoLoadVersion(name, id){
 // --- Sample payload (Batch with multiple calculations) ---
 const sampleItem = {
   name: 'Calculation 1',
-  currency: (navigator.language?.startsWith('cs') ? 'CZK' : 'USD'),
+  currency: (navigator.language?.toLowerCase().startsWith('cs') ? 'CZK' : (navigator.language?.toLowerCase().startsWith('de') ? 'EUR' : 'USD')),
   initialPrincipal: 10000,
   annualRate: 0.07,
   totalMonths: 120,
@@ -274,11 +347,11 @@ function showError(msg) {
 function clearError() { showError(''); }
 
 function normalizeItem(it){
-  const o = Object.assign({ name:'', currency:(currentLang==='cs'?'CZK':'USD'), initialPrincipal:0, annualRate:0, totalMonths:1, recurring:[], oneTime:[] }, it||{});
+  const o = Object.assign({ name:'', currency:(currentLang==='cs'?'CZK':(currentLang==='de'?'EUR':'USD')), initialPrincipal:0, annualRate:0, totalMonths:1, recurring:[], oneTime:[] }, it||{});
   o.recurring = Array.isArray(o.recurring) ? o.recurring : [];
   o.oneTime = Array.isArray(o.oneTime) ? o.oneTime : [];
   if (typeof o.name !== 'string') o.name = '';
-  if (typeof o.currency !== 'string' || !o.currency) o.currency = (currentLang==='cs'?'CZK':'USD');
+  if (typeof o.currency !== 'string' || !o.currency) o.currency = (currentLang==='cs'?'CZK':(currentLang==='de'?'EUR':'USD'));
   return o;
 }
 
@@ -410,7 +483,7 @@ function drawStackedGroupedMonths(pairs){
       backgroundColor: withAlpha(color, 0.7),
       borderColor: color,
       stack: 'calc'+idx,
-      currency: req.currency || (currentLang==='cs'?'CZK':'USD'),
+      currency: req.currency || (currentLang==='cs' ? 'CZK' : (currentLang==='de' ? 'EUR' : 'USD')),
     });
     datasets.push({
       label: `${name} – ${t('legend.interest')}`,
@@ -443,7 +516,7 @@ function drawStackedGroupedYears(pairs){
     return arr;
   });
   let maxY = 0; yearsArrays.forEach(a=>{ if (a.length>maxY) maxY=a.length; });
-  const labels = Array.from({length:maxY}, (_,i)=> (currentLang==='cs'?'R':'Y') + (i+1));
+  const labels = Array.from({length:maxY}, (_,i)=> (currentLang==='cs' ? 'R' : (currentLang==='de' ? 'J' : 'Y')) + (i+1));
   const datasets = [];
   const palette = basePalette();
   yearsArrays.forEach((arr, idx)=>{
@@ -452,7 +525,7 @@ function drawStackedGroupedYears(pairs){
     const color = palette[idx % palette.length];
     const req = pairs[idx]?.request || {};
     const name = calcDisplayName(req, idx);
-    const cur = req.currency || (currentLang==='cs'?'CZK':'USD');
+    const cur = req.currency || (currentLang==='cs' ? 'CZK' : (currentLang==='de' ? 'EUR' : 'USD'));
     datasets.push({
       label: `${name} – ${t('legend.principal')}`,
       data: principalData,
@@ -483,7 +556,7 @@ function renderLegend(pairs){
     const req = p.request || {};
     const color = palette[idx % palette.length];
     const item = document.createElement('div');
-    const cur = req.currency || (currentLang==='cs'?'CZK':'USD');
+    const cur = req.currency || (currentLang==='cs' ? 'CZK' : (currentLang==='de' ? 'EUR' : 'USD'));
     const name = calcDisplayName(req, idx);
     item.className = 'legend-item';
     item.setAttribute('data-idx', String(idx));
@@ -505,7 +578,7 @@ function renderLegend(pairs){
 function buildLegendHover(req, idx, color){
   const rec = Array.isArray(req.recurring)? req.recurring : [];
   const one = Array.isArray(req.oneTime)? req.oneTime : [];
-  const cur = req.currency || (currentLang==='cs'?'CZK':'USD');
+  const cur = req.currency || (currentLang==='cs' ? 'CZK' : (currentLang==='de' ? 'EUR' : 'USD'));
   const recList = rec.map(r=>`<li>${r.schedule||'monthly'} · ${moneyWith(r.amount||0, cur)} · ${r.startMonth||0}→${(r.endMonth??-1)}</li>`).join('') || '<li>–</li>';
   const oneList = one.map(o=>`<li>${moneyWith(o.amount||0, cur)} @ M${o.atMonth||0}</li>`).join('') || '<li>–</li>';
   const name = calcDisplayName(req, idx);
@@ -573,7 +646,7 @@ function renderBarChart(labels, datasets, title){
       }
     },
     plugins: {
-      title: { display: true, text: (currentLang==='cs'?'Vývoj portfolia – ':'Portfolio evolution – ') + title },
+      title: { display: true, text: (currentLang==='cs' ? 'Vývoj portfolia – ' : (currentLang==='de' ? 'Portfolioentwicklung – ' : 'Portfolio evolution – ')) + title },
       legend: { display: false },
       tooltip: {
         filter: (ti) => {
@@ -594,7 +667,7 @@ function renderBarChart(labels, datasets, title){
         },
         callbacks: {
           label: (ctx)=> {
-            const cur = ctx.dataset.currency || (currentLang==='cs'?'CZK':'USD');
+            const cur = ctx.dataset.currency || (currentLang==='cs' ? 'CZK' : (currentLang==='de' ? 'EUR' : 'USD'));
             return `${ctx.dataset.label}: ${moneyWith(ctx.parsed.y, cur)}`;
           }
         }
@@ -665,7 +738,7 @@ function renderFormMulti(){
     const isCollapsed = !!collapsedState[idx];
     wrap.className = 'calc-card' + (isCollapsed ? ' collapsed' : '');
     const displayName = calcDisplayName(it, idx);
-    const summary = `${moneyWith(it.initialPrincipal||0, it.currency|| (currentLang==='cs'?'CZK':'USD'))} · ${t('legend.rate')}: ${numberFmt(it.annualRate||0)} · ${t('legend.months')}: ${it.totalMonths||0}`;
+    const summary = `${moneyWith(it.initialPrincipal||0, it.currency|| (currentLang==='cs' ? 'CZK' : (currentLang==='de' ? 'EUR' : 'USD')))} · ${t('legend.rate')}: ${numberFmt(it.annualRate||0)} · ${t('legend.months')}: ${it.totalMonths||0}`;
     const arrow = isCollapsed ? '▼' : '▲';
     const toggleTitle = isCollapsed ? t('btn.expand') : t('btn.collapse');
     const actionsHtml = isCollapsed ? '' : (
@@ -714,7 +787,7 @@ function renderFormMulti(){
 
     // fill top fields
     wrap.querySelector('input[data-field="name"]').value = (it.name||'');
-    wrap.querySelector('select[data-field="currency"]').value = (it.currency || (currentLang==='cs'?'CZK':'USD'));
+    wrap.querySelector('select[data-field="currency"]').value = (it.currency || (currentLang==='cs' ? 'CZK' : (currentLang==='de' ? 'EUR' : 'USD')));
     wrap.querySelector('input[data-field="initialPrincipal"]').value = Number(it.initialPrincipal||0);
     wrap.querySelector('input[data-field="annualRate"]').value = Number(it.annualRate||0);
     wrap.querySelector('input[data-field="totalMonths"]').value = Number(it.totalMonths||1);
