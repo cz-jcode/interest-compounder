@@ -1,6 +1,10 @@
 # interest-compounder
 
+Demo (online): https://interest-compounder-495033672529.europe-west1.run.app/
+
 Public Go HTTP API and web UI for simulating compound interest across multiple calculations, with recurring and one‑time contributions. Returns monthly and yearly series ready for charts. Multi‑calc output is stackable (principal + interest) with per‑calculation currency and naming.
+
+Note: The web UI stores your repository/calculation data only locally in your browser (local storage). No data is sent to any backend for persistence.
 
 ## Features
 - Batch endpoint: send multiple calculations in one request (`calculations[]`).
