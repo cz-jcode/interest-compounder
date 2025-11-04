@@ -505,24 +505,54 @@ function drawStackedGroupedMonths(pairs){
     datasets.push({
       label: t('legend.principal'),
       data: principalData,
-      backgroundColor: withAlpha(color, 0.7),
+      // Dynamic background to highlight only the specific calculation's column under cursor
+      backgroundColor: (ctx) => {
+        const ds = ctx.dataset || {};
+        const baseA = ds.baseAlpha ?? 0.7;
+        const anyHover = (hoverIndex !== null && hoverCalcName);
+        const selected = anyHover && (ctx.dataIndex === hoverIndex) && (ds.calcName === hoverCalcName);
+        const alpha = selected ? Math.min(1, baseA + 0.2) : (anyHover ? (ds.dimAlpha ?? 0.12) : baseA);
+        return withAlpha(ds.hexColor || color, alpha);
+      },
       borderColor: color,
+      borderWidth: (ctx) => {
+        const ds = ctx.dataset || {};
+        return (hoverIndex !== null && hoverCalcName && ctx.dataIndex === hoverIndex && ds.calcName === hoverCalcName) ? 2 : 0;
+      },
       stack: 'calc'+idx,
       currency: cur,
       calcName: name,
       balances: balancesData,
-      periodType: 'month'
+      periodType: 'month',
+      // helpers for dynamic coloring
+      hexColor: color,
+      baseAlpha: 0.7,
+      dimAlpha: 0.7
     });
     datasets.push({
       label: t('legend.interest'),
       data: interestData,
-      backgroundColor: withAlpha(color, 0.35),
+      backgroundColor: (ctx) => {
+        const ds = ctx.dataset || {};
+        const baseA = ds.baseAlpha ?? 0.35;
+        const anyHover = (hoverIndex !== null && hoverCalcName);
+        const selected = anyHover && (ctx.dataIndex === hoverIndex) && (ds.calcName === hoverCalcName);
+        const alpha = selected ? Math.min(1, baseA + 0.25) : (anyHover ? (ds.dimAlpha ?? 0.08) : baseA);
+        return withAlpha(ds.hexColor || color, alpha);
+      },
       borderColor: withAlpha(color, 0.5),
+      borderWidth: (ctx) => {
+        const ds = ctx.dataset || {};
+        return (hoverIndex !== null && hoverCalcName && ctx.dataIndex === hoverIndex && ds.calcName === hoverCalcName) ? 2 : 0;
+      },
       stack: 'calc'+idx,
       currency: cur,
       calcName: name,
       balances: balancesData,
-      periodType: 'month'
+      periodType: 'month',
+      hexColor: color,
+      baseAlpha: 0.35,
+      dimAlpha: 0.35
     });
   });
   renderBarChart(labels, datasets, `${t('chart.months')}`);
@@ -561,24 +591,52 @@ function drawStackedGroupedYears(pairs){
     datasets.push({
       label: t('legend.principal'),
       data: principalData,
-      backgroundColor: withAlpha(color, 0.7),
+      backgroundColor: (ctx) => {
+        const ds = ctx.dataset || {};
+        const baseA = ds.baseAlpha ?? 0.7;
+        const anyHover = (hoverIndex !== null && hoverCalcName);
+        const selected = anyHover && (ctx.dataIndex === hoverIndex) && (ds.calcName === hoverCalcName);
+        const alpha = selected ? Math.min(1, baseA + 0.2) : (anyHover ? (ds.dimAlpha ?? 0.12) : baseA);
+        return withAlpha(ds.hexColor || color, alpha);
+      },
       borderColor: color,
+      borderWidth: (ctx) => {
+        const ds = ctx.dataset || {};
+        return (hoverIndex !== null && hoverCalcName && ctx.dataIndex === hoverIndex && ds.calcName === hoverCalcName) ? 2 : 0;
+      },
       stack: 'calc'+idx,
       currency: cur,
       calcName: name,
       balances: balancesData,
-      periodType: 'year'
+      periodType: 'year',
+      hexColor: color,
+      baseAlpha: 0.7,
+      dimAlpha: 0.7
     });
     datasets.push({
       label: t('legend.interest'),
       data: interestData,
-      backgroundColor: withAlpha(color, 0.35),
+      backgroundColor: (ctx) => {
+        const ds = ctx.dataset || {};
+        const baseA = ds.baseAlpha ?? 0.35;
+        const anyHover = (hoverIndex !== null && hoverCalcName);
+        const selected = anyHover && (ctx.dataIndex === hoverIndex) && (ds.calcName === hoverCalcName);
+        const alpha = selected ? Math.min(1, baseA + 0.25) : (anyHover ? (ds.dimAlpha ?? 0.08) : baseA);
+        return withAlpha(ds.hexColor || color, alpha);
+      },
       borderColor: withAlpha(color, 0.5),
+      borderWidth: (ctx) => {
+        const ds = ctx.dataset || {};
+        return (hoverIndex !== null && hoverCalcName && ctx.dataIndex === hoverIndex && ds.calcName === hoverCalcName) ? 2 : 0;
+      },
       stack: 'calc'+idx,
       currency: cur,
       calcName: name,
       balances: balancesData,
-      periodType: 'year'
+      periodType: 'year',
+      hexColor: color,
+      baseAlpha: 0.35,
+      dimAlpha: 0.35
     });
   });
   renderBarChart(labels, datasets, `${t('chart.years')}`);
@@ -603,7 +661,7 @@ function renderLegend(pairs){
     item.className = 'legend-item';
     item.setAttribute('data-idx', String(idx));
     item.innerHTML = `
-      <span class="swatch" style="background:${withAlpha(color, 0.8)}; border-color:${color}"></span>
+      <span class="swatch" style="background:${withAlpha(color, 0.9)}; border-color:${color}"></span>
       <span class="legend-text">${name}: ${moneyWith(req.initialPrincipal||0, cur)} · ${t('legend.rate')}: ${numberFmt(req.annualRate||0)} · ${t('legend.months')}: ${req.totalMonths||0} — ${totalsText}</span>
     `;
     item.addEventListener('mouseenter', (ev)=>{
@@ -671,26 +729,15 @@ function renderBarChart(labels, datasets, title){
   const options = {
     responsive: true,
     maintainAspectRatio: false,
-    interaction: { mode: 'index', intersect: false },
+    interaction: { mode: 'nearest', axis: 'x', intersect: false },
     onHover: (evt, elements, c) => {
-      // Detect hovered column by X-axis position only (month/year index), then pick 1 nearest calculation within that column
+      // Pick the truly nearest bar along X (column+calculation), not the first in the index group
       try {
-        const atIndex = c.getElementsAtEventForMode(evt, 'index', { intersect: false }, true);
-        if (atIndex && atIndex.length > 0) {
-          // All elements share the same dataIndex
-          hoverIndex = atIndex[0].index;
-          // Choose the element whose bar center (element.x) is closest to cursor X
-          let best = atIndex[0];
-          let bestDx = Number.POSITIVE_INFINITY;
-          for (const el of atIndex) {
-            const x = el.element && typeof el.element.x === 'number' ? el.element.x : null;
-            if (x != null && typeof evt.x === 'number') {
-              const dx = Math.abs(x - evt.x);
-              if (dx < bestDx) { bestDx = dx; best = el; }
-            }
-          }
-          const di = best.datasetIndex;
-          const ds = c.data?.datasets?.[di];
+        const nearest = c.getElementsAtEventForMode(evt, 'nearest', { axis: 'x', intersect: false }, true);
+        if (nearest && nearest.length > 0) {
+          const el = nearest[0];
+          hoverIndex = el.index;
+          const ds = c.data?.datasets?.[el.datasetIndex];
           hoverCalcName = ds?.calcName || null;
         } else {
           hoverIndex = null;
@@ -700,6 +747,12 @@ function renderBarChart(labels, datasets, title){
         hoverIndex = null;
         hoverCalcName = null;
       }
+      try { c && c.update('none'); } catch {}
+    },
+    onLeave: (evt, elements, c) => {
+      hoverIndex = null;
+      hoverCalcName = null;
+      try { c && c.update('none'); } catch {}
     },
     plugins: {
       title: { display: true, text: (currentLang==='cs' ? 'Vývoj portfolia – ' : (currentLang==='de' ? 'Portfolioentwicklung – ' : 'Portfolio evolution – ')) + title },
